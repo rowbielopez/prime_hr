@@ -7,11 +7,14 @@ function isProtectedPath(pathname: string) {
     pathname.startsWith("/admin") ||
     pathname.startsWith("/compliance") ||
     pathname.startsWith("/employees") ||
-    pathname.startsWith("/recruitment")
+    pathname.startsWith("/recruitment") ||
+    pathname.startsWith("/learning") ||
+    pathname.startsWith("/performance") ||
+    pathname.startsWith("/rewards")
   );
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname === "/auth/callback") {
     return NextResponse.next({ request });
   }
