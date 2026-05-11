@@ -17,8 +17,12 @@
 /.next/
 /out/
 
+# Accidental nested copy of this app (see eslint.config.mjs); do not commit
+/prime-hr/
+
 # production
 /build
+/design
 
 # misc
 .DS_Store
@@ -30,8 +34,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (secrets) — *.example files stay tracked
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+supabase/.env
 
 # vercel
 .vercel

@@ -7,11 +7,15 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
+    // Build / generated output at any depth (root `.next` and nested copies)
+    "**/.next/**",
+    "**/out/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/next-env.d.ts",
+    // Accidental nested duplicate app (`./prime-hr/` inside this repo) — avoid linting it twice
+    "prime-hr/**",
   ]),
 ]);
 
