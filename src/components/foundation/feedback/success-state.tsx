@@ -38,6 +38,7 @@ export function SuccessState({
                 initial={reduced ? false : { scale: 0.85, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: reduced ? 0 : 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+                suppressHydrationWarning
                 className="flex size-10 items-center justify-center rounded-full bg-status-success/15 text-status-success"
             >
                 <CheckCircle2 className="size-5" />

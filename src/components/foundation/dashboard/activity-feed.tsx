@@ -75,6 +75,7 @@ export function ActivityFeed({
                             delay: reduced ? 0 : idx * 0.03,
                         }}
                         className="flex gap-3"
+                        suppressHydrationWarning
                     >
                         <span
                             className={cn(

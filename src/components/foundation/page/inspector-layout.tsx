@@ -51,6 +51,7 @@ export function InspectorLayout({
                         animate={{ opacity: 1, x: 0 }}
                         exit={reduced ? { opacity: 0 } : { opacity: 0, x: 16 }}
                         transition={{ duration: reduced ? 0 : 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+                        suppressHydrationWarning
                         className={cn(
                             "sticky top-4 hidden shrink-0 self-start rounded-xl border border-border/70 bg-surface-panel shadow-premium-sm lg:block",
                             widthClass[inspectorWidth],
@@ -72,6 +73,7 @@ export function InspectorLayout({
                         animate={{ opacity: 1, y: 0 }}
                         exit={reduced ? { opacity: 0 } : { opacity: 0, y: 24 }}
                         transition={{ duration: reduced ? 0 : 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+                        suppressHydrationWarning
                         className="fixed inset-x-2 bottom-2 z-40 max-h-[80vh] overflow-hidden rounded-xl border border-border/80 bg-surface-panel shadow-premium-lg lg:hidden"
                     >
                         <InspectorChrome title={inspectorTitle} onClose={onClose}>

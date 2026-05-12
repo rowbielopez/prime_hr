@@ -53,6 +53,7 @@ export function AutosaveIndicator({
                     exit={reduced ? { opacity: 0 } : { opacity: 0, y: 2 }}
                     transition={{ duration: reduced ? 0 : 0.18, ease: [0.2, 0.8, 0.2, 1] }}
                     className="inline-flex items-center gap-1.5"
+                    suppressHydrationWarning
                 >
                     {status === "saving" ? (
                         <Loader2 className="size-3.5 animate-spin" />
