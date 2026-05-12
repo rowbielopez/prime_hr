@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { LogOut, User } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import {
@@ -23,7 +22,6 @@ function getInitials(email: string): string {
 }
 
 export function UserMenu() {
-    const router = useRouter();
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
     const [email, setEmail] = useState<string | null>(null);
     const [signingOut, setSigningOut] = useState(false);
@@ -37,8 +35,7 @@ export function UserMenu() {
     async function handleSignOut() {
         setSigningOut(true);
         await supabase.auth.signOut();
-        router.push("/login");
-        router.refresh();
+        window.location.href = "/login";
     }
 
     const initials = email ? getInitials(email) : "?";
