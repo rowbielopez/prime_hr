@@ -1,6 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export type FilterOption = {
@@ -16,18 +23,20 @@ type FilterSelectProps = {
 };
 
 export function FilterSelect({ value, onChange, options, className }: FilterSelectProps) {
+  const selectedLabel = options.find((option) => option.value === value)?.label ?? options[0]?.label ?? "Filter";
   return (
-    <select
-      className={cn("h-8 rounded-md border bg-background px-2 text-sm", className)}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={(nextValue) => nextValue !== null && onChange(nextValue)}>
+      <SelectTrigger size="sm" className={cn("min-w-34 bg-surface-panel shadow-premium-sm", className)}>
+        <SelectValue>{selectedLabel}</SelectValue>
+      </SelectTrigger>
+      <SelectContent align="end">
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -47,17 +56,17 @@ export function StatusFilterControls({
   allLabel = "All",
 }: StatusFilterControlsProps) {
   return (
-    <>
-      <Button variant={value === "all" ? "default" : "outline"} size="sm" onClick={() => onChange("all")}>
+    <div className="inline-flex rounded-xl border premium-border bg-surface-inset p-1 shadow-premium-sm">
+      <Button variant={value === "all" ? "default" : "ghost"} size="sm" onClick={() => onChange("all")}>
         {allLabel}
       </Button>
-      <Button variant={value === "active" ? "default" : "outline"} size="sm" onClick={() => onChange("active")}>
+      <Button variant={value === "active" ? "default" : "ghost"} size="sm" onClick={() => onChange("active")}>
         {activeLabel}
       </Button>
-      <Button variant={value === "inactive" ? "default" : "outline"} size="sm" onClick={() => onChange("inactive")}>
+      <Button variant={value === "inactive" ? "default" : "ghost"} size="sm" onClick={() => onChange("inactive")}>
         {inactiveLabel}
       </Button>
-    </>
+    </div>
   );
 }
 

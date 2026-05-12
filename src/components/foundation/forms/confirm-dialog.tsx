@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactElement, type ReactNode } from "react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import {
     Dialog,
     DialogClose,
@@ -62,12 +63,19 @@ export function ConfirmDialog({
     isPending = false,
 }: ConfirmDialogProps) {
     const body: ReactNode = (
-        <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>{title}</DialogTitle>
+        <DialogContent size="sm">
+            <DialogHeader className="pb-3">
+                <div className="flex items-start gap-3">
+                    <span className={variant === "destructive" ? "flex size-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive" : "flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"}>
+                        <AlertTriangle className="size-5" aria-hidden />
+                    </span>
+                    <div className="min-w-0 space-y-1">
+                        <DialogTitle>{title}</DialogTitle>
                 {description ? (
                     <DialogDescription>{description}</DialogDescription>
                 ) : null}
+                    </div>
+                </div>
             </DialogHeader>
             <DialogFooter>
                 <DialogClose
@@ -83,6 +91,7 @@ export function ConfirmDialog({
                     disabled={isPending}
                     onClick={onConfirm}
                 >
+                    {isPending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
                     {confirmLabel}
                 </Button>
             </DialogFooter>

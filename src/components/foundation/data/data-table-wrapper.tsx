@@ -12,12 +12,12 @@ type DataTableWrapperProps = {
 
 export function DataTableWrapper({ title, description, actions, toolbar, children }: DataTableWrapperProps) {
   return (
-    <Card className="border-border/80">
-      <CardHeader className="space-y-4">
+    <Card className="overflow-hidden border-border/80 bg-surface-panel shadow-premium-sm">
+      <CardHeader className="space-y-4 border-b premium-border bg-surface-glass/60 p-5 supports-backdrop-filter:backdrop-blur-xl">
         <SectionHeader title={title} description={description} actions={actions} />
         {toolbar ? <div>{toolbar}</div> : null}
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent className="p-5">{children}</CardContent>
     </Card>
   );
 }

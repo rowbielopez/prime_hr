@@ -5,6 +5,8 @@ export type AdminTableColumn<RowT> = {
   header: string;
   className?: string;
   cell: (row: RowT) => ReactNode;
+  sortAccessor?: (row: RowT) => string | number | Date | null | undefined;
+  enableHiding?: boolean;
 };
 
 export type AdminRowAction = {

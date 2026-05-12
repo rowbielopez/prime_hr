@@ -57,7 +57,7 @@ export function DrawerForm({
                     className,
                 )}
             >
-                <SheetHeader className="border-b border-border/70 px-5 py-4">
+                <SheetHeader>
                     <SheetTitle className="text-base font-semibold">{title}</SheetTitle>
                     {description ? (
                         <SheetDescription className="text-sm text-muted-foreground">
@@ -65,9 +65,9 @@ export function DrawerForm({
                         </SheetDescription>
                     ) : null}
                 </SheetHeader>
-                <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
+                <div className="flex-1 overflow-y-auto px-5 py-5 [scrollbar-width:thin] sm:px-6">{children}</div>
                 {footer ? (
-                    <SheetFooter className="mt-0 flex-row items-center justify-end gap-2 border-t border-border/70 bg-surface-inset/40 px-5 py-3">
+                    <SheetFooter className="mt-0 flex-row items-center justify-end gap-2">
                         {footer}
                     </SheetFooter>
                 ) : null}
