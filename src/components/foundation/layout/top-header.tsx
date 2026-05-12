@@ -5,6 +5,7 @@ import { Bell, Menu, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/foundation/theme/theme-toggle";
+import { UserMenu } from "@/components/foundation/layout/user-menu";
 
 type TopHeaderProps = {
   title?: string;
@@ -72,6 +73,8 @@ export function TopHeader({
         <Button type="button" variant="ghost" size="icon-sm" aria-label="Open notifications">
           <Bell className="size-4" />
         </Button>
+        <Separator orientation="vertical" className="hidden h-7 md:block" />
+        <UserMenu />
         {actions ? <Separator orientation="vertical" className="hidden h-7 md:block" /> : null}
         {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
       </div>

@@ -38,3 +38,14 @@ export const panelVariants: Variants = {
     animate: { opacity: 1, scale: 1, y: 0 },
     exit: { opacity: 0, scale: 0.985, y: 4 },
 };
+
+// Landing page scroll-reveal
+export const scrollRevealVariants: Variants = {
+    hidden: { opacity: 0, y: 32 },
+    visible: { opacity: 1, y: 0 },
+};
+
+export const scrollRevealTransition = {
+    duration: 0.52,
+    ease: [0.2, 0.8, 0.2, 1],
+} as const;
