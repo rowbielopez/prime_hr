@@ -27,6 +27,7 @@ export function MotionPage({ children, className, ...props }: MotionPrimitivePro
             variants={reduceMotion ? undefined : pageTransitionVariants}
             transition={premiumTransition}
             className={className}
+            suppressHydrationWarning
             {...props}
         >
             {children}
@@ -43,6 +44,7 @@ export function StaggerContainer({ children, className, ...props }: MotionPrimit
             animate="animate"
             variants={reduceMotion ? undefined : staggerContainerVariants}
             className={className}
+            suppressHydrationWarning
             {...props}
         >
             {children}
@@ -58,6 +60,7 @@ export function StaggerItem({ children, className, ...props }: MotionPrimitivePr
             variants={reduceMotion ? undefined : staggerItemVariants}
             transition={premiumTransition}
             className={className}
+            suppressHydrationWarning
             {...props}
         >
             {children}
@@ -76,6 +79,7 @@ export function MotionPanel({ children, className, ...props }: MotionPrimitivePr
             variants={reduceMotion ? undefined : panelVariants}
             transition={premiumSpring}
             className={cn("rounded-xl border premium-border bg-surface-panel shadow-premium-sm", className)}
+            suppressHydrationWarning
             {...props}
         >
             {children}

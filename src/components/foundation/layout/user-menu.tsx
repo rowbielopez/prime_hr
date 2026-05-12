@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
@@ -49,6 +50,7 @@ export function UserMenu() {
                 {initials}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8} className="min-w-52">
+                <DropdownMenuGroup>
                 <DropdownMenuLabel>
                     <div className="flex items-center gap-2.5 py-0.5">
                         <div className="flex size-7 flex-shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
@@ -60,6 +62,7 @@ export function UserMenu() {
                         </div>
                     </div>
                 </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem disabled>
                     <User />
