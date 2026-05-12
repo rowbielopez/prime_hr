@@ -18,7 +18,7 @@ Next.js app with Supabase (Postgres, Auth, RLS). See `docs/` for architecture no
 4. **Run the app:** `npm run dev` → [http://localhost:3000](http://localhost:3000)
 
 5. **Checks before pushing:** `npm run verify` (typecheck, lint, production build).
-
+aaaaaa
 ## Scripts
 
 | Script        | Purpose                          |
