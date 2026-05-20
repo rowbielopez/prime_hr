@@ -14,6 +14,7 @@ export type { PageMeta } from "@/components/foundation/page/breadcrumbs";
 export { Breadcrumbs } from "@/components/foundation/page/breadcrumbs-component";
 export type { BreadcrumbsProps } from "@/components/foundation/page/breadcrumbs-component";
 export { SectionHeader } from "@/components/foundation/page/section-header";
+export { ContentSection } from "@/components/foundation/page/content-section";
 
 export { useLocalStorage } from "@/components/foundation/hooks/use-local-storage";
 

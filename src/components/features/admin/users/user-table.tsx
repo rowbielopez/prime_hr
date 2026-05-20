@@ -26,6 +26,7 @@ import {
 } from "@/components/foundation/data/filter-controls";
 import type {
   CampusOption,
+  EmployeeSearchResult,
   OfficeOption,
   RoleOption,
   UserListItem,
@@ -35,6 +36,9 @@ import { userManagementSchema } from "@/features/admin/users/schemas/user-manage
 import {
   toggleUserAccessAction,
   updateUserManagementAction,
+  relinkEmployeeAction,
+  searchEmployeesAction,
+  manualProvisionUserAction,
 } from "@/features/admin/users/actions";
 
 type UserTableProps = {
@@ -91,6 +95,13 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [formState, setFormState] = useState<UserFormState | null>(null);
+  const [relinkingUserId, setRelinkingUserId] = useState<string | null>(null);
+  const [relinkQuery, setRelinkQuery] = useState("");
+  const [relinkResults, setRelinkResults] = useState<EmployeeSearchResult[]>([]);
+  const [relinkSelectedId, setRelinkSelectedId] = useState<string | null | undefined>(undefined);
+  const [showProvisionDialog, setShowProvisionDialog] = useState(false);
+  const [provisionEmail, setProvisionEmail] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   const tableState = useAdminTableState<UserListItem>({
     rows: users,
@@ -125,13 +136,14 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
         { key: "view", label: "View Details" },
         ...(canMutate
           ? [
-              { key: "edit", label: "Assign Role/Campus/Office" },
-              {
-                key: "toggle-access",
-                label: row.isActive ? "Deactivate Access" : "Activate Access",
-                destructive: row.isActive,
-              },
-            ]
+            { key: "edit", label: "Assign Role/Campus/Office" },
+            { key: "relink-employee", label: "Change Employee Link" },
+            {
+              key: "toggle-access",
+              label: row.isActive ? "Deactivate Access" : "Activate Access",
+              destructive: row.isActive,
+            },
+          ]
           : []),
       ];
     }
@@ -151,6 +163,7 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
 
   const viewingUser = users.find((user) => user.id === viewingUserId) ?? null;
   const editingUser = users.find((user) => user.id === editingUserId) ?? null;
+  const relinkingUser = users.find((user) => user.id === relinkingUserId) ?? null;
   const selectedRole = roles.find((role) => role.id === (formState?.roleId ?? "")) ?? null;
   const requiresCampus = selectedRole?.scopeType === "scoped";
   const officeOptions = offices.filter((office) => {
@@ -171,6 +184,50 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
     });
   }
 
+  function openRelink(userId: string) {
+    setRelinkingUserId(userId);
+    setRelinkQuery("");
+    setRelinkResults([]);
+    setRelinkSelectedId(undefined);
+  }
+
+  async function handleRelinkSearch() {
+    if (!relinkQuery.trim()) return;
+    setIsSearching(true);
+    try {
+      const results = await searchEmployeesAction(relinkQuery);
+      setRelinkResults(results);
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
+  function submitRelink() {
+    if (!relinkingUserId || relinkSelectedId === undefined) return;
+    startTransition(async () => {
+      const result = await relinkEmployeeAction(relinkingUserId, relinkSelectedId);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(relinkSelectedId ? "Employee linked successfully" : "Employee link removed");
+      setRelinkingUserId(null);
+    });
+  }
+
+  function handleProvision() {
+    startTransition(async () => {
+      const result = await manualProvisionUserAction(provisionEmail);
+      if (!result.ok) {
+        toast.error(result.error, { duration: 8000 });
+        return;
+      }
+      toast.success("Account provisioned. Find it in the table below and assign a role to activate it.");
+      setShowProvisionDialog(false);
+      setProvisionEmail("");
+    });
+  }
+
   function handleRowAction(input: { rowKey: string; actionKey: string }) {
     const user = users.find((item) => item.id === input.rowKey);
     if (!user) return;
@@ -181,6 +238,10 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
     }
     if (input.actionKey === "edit") {
       openEdit(user.id);
+      return;
+    }
+    if (input.actionKey === "relink-employee") {
+      openRelink(user.id);
       return;
     }
     if (input.actionKey === "toggle-access") {
@@ -223,6 +284,13 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
     <DataTableWrapper
       title="Users"
       description="Manage user access, role scope, and organizational assignments."
+      actions={
+        actorIsSuperAdmin ? (
+          <Button size="sm" variant="outline" onClick={() => { setProvisionEmail(""); setShowProvisionDialog(true); }}>
+            Provision Account
+          </Button>
+        ) : undefined
+      }
     >
       <AdminDataTable
         rows={tableState.rows}
@@ -274,6 +342,12 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
               <p><span className="font-medium">Office:</span> {viewingUser.officeName ?? "-"}</p>
               <p><span className="font-medium">Status:</span> {viewingUser.isActive ? "Active" : "Inactive"}</p>
               <p><span className="font-medium">Last login:</span> {viewingUser.lastLoginAt ?? "Never"}</p>
+              <p>
+                <span className="font-medium">Linked employee:</span>{" "}
+                {viewingUser.employeeNo
+                  ? `${viewingUser.employeeNo} — ${viewingUser.employeeName ?? ""}`
+                  : <span className="text-muted-foreground">Not linked</span>}
+              </p>
             </div>
           ) : null}
           <DialogFooter>
@@ -300,11 +374,11 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                     setFormState((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            roleId: event.target.value,
-                            campusId: null,
-                            officeId: null,
-                          }
+                          ...prev,
+                          roleId: event.target.value,
+                          campusId: null,
+                          officeId: null,
+                        }
                         : prev
                     )
                   }
@@ -326,10 +400,10 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                       setFormState((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              campusId: event.target.value || null,
-                              officeId: null,
-                            }
+                            ...prev,
+                            campusId: event.target.value || null,
+                            officeId: null,
+                          }
                           : prev
                       )
                     }
@@ -353,9 +427,9 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                       setFormState((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              officeId: event.target.value || null,
-                            }
+                            ...prev,
+                            officeId: event.target.value || null,
+                          }
                           : prev
                       )
                     }
@@ -377,9 +451,9 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                     setFormState((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            isActive: event.target.checked,
-                          }
+                          ...prev,
+                          isActive: event.target.checked,
+                        }
                         : prev
                     )
                   }
@@ -391,6 +465,110 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingUserId(null)} disabled={isPending}>Cancel</Button>
             <Button onClick={submitUserAssignment} disabled={isPending}>Save Assignment</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!relinkingUser} onOpenChange={(open) => { if (!open) setRelinkingUserId(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Change Employee Link</DialogTitle>
+            <DialogDescription>Link this user account to an employee record, or remove the existing link.</DialogDescription>
+          </DialogHeader>
+          {relinkingUser ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {relinkingUser.fullName} ({relinkingUser.email})
+              </p>
+              <p className="text-sm">
+                <span className="font-medium">Current link: </span>
+                {relinkingUser.employeeNo
+                  ? `${relinkingUser.employeeNo} — ${relinkingUser.employeeName ?? ""}`
+                  : <span className="text-muted-foreground">Not linked</span>}
+              </p>
+              <div className="flex gap-2">
+                <input
+                  className="h-9 flex-1 rounded-md border px-3 text-sm"
+                  placeholder="Search by name, email, or employee no."
+                  value={relinkQuery}
+                  onChange={(e) => setRelinkQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleRelinkSearch(); }}
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleRelinkSearch}
+                  disabled={isSearching || !relinkQuery.trim()}
+                >
+                  {isSearching ? "Searching..." : "Search"}
+                </Button>
+              </div>
+              {relinkResults.length > 0 ? (
+                <div className="rounded-md border divide-y max-h-48 overflow-y-auto">
+                  {relinkResults.map((emp) => (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${relinkSelectedId === emp.id ? "bg-muted font-medium" : ""
+                        }`}
+                      onClick={() => setRelinkSelectedId(emp.id)}
+                    >
+                      <span className="font-medium">{emp.employeeNo}</span> — {emp.fullName}
+                      {emp.email ? <span className="text-muted-foreground"> · {emp.email}</span> : null}
+                      {emp.campusName ? <span className="text-muted-foreground"> · {emp.campusName}</span> : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {relinkingUser.employeeId ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive border-destructive/40"
+                  onClick={() => setRelinkSelectedId(null)}
+                  disabled={relinkSelectedId === null}
+                >
+                  {relinkSelectedId === null ? "Will remove link on save" : "Remove employee link"}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRelinkingUserId(null)} disabled={isPending}>Cancel</Button>
+            <Button onClick={submitRelink} disabled={isPending || relinkSelectedId === undefined}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showProvisionDialog} onOpenChange={(open) => { if (!open) setShowProvisionDialog(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Provision Account</DialogTitle>
+            <DialogDescription>
+              Manually create a system account for someone whose automatic provisioning failed or who needs to be set up before their first sign-in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100 space-y-1">
+              <p className="font-medium">Requirement</p>
+              <p>The person must have attempted to sign in with Google at least once — even if they saw an error. That registers their Google account. If they have never done so, ask them to click &quot;Continue with CSU Google Account&quot; on the login page, then come back here.</p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Google sign-in email</label>
+              <input
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                type="email"
+                placeholder="employee@csu.edu.ph"
+                value={provisionEmail}
+                onChange={(e) => setProvisionEmail(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !isPending) handleProvision(); }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={isPending} onClick={() => setShowProvisionDialog(false)}>Cancel</Button>
+            <Button disabled={isPending || !provisionEmail.trim()} onClick={handleProvision}>
+              {isPending ? "Provisioning…" : "Provision Account"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

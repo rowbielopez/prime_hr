@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DashboardMetricCard } from "@/components/foundation/dashboard/dashboard-metric-card";
+import { ContentSection } from "@/components/foundation/page/content-section";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { PerformanceCycleProgressRow, PerformanceDashboardSummary, PerformanceStatusCount } from "@/features/performance/types";
 
@@ -22,7 +23,7 @@ export function PerformanceDashboardCards({
         <DashboardMetricCard label="Rejected" value={String(summary.rejectedRecords)} trend="Reviewer rejected" />
       </div>
       {cycleProgress.length > 0 ? (
-        <div className="rounded-lg border p-4">
+        <ContentSection>
           <h3 className="text-sm font-medium">Completion by cycle</h3>
           <p className="text-xs text-muted-foreground">Snapshot of records per cycle in your scope.</p>
           <div className="mt-3 overflow-x-auto">
@@ -51,9 +52,9 @@ export function PerformanceDashboardCards({
               </TableBody>
             </Table>
           </div>
-        </div>
+        </ContentSection>
       ) : null}
-      <div className="rounded-lg border p-4">
+      <ContentSection>
         <h3 className="text-sm font-medium">Record status distribution</h3>
         <div className="mt-3 space-y-2">
           {statusCounts.length === 0 ? (
@@ -67,7 +68,7 @@ export function PerformanceDashboardCards({
             ))
           )}
         </div>
-      </div>
+      </ContentSection>
     </div>
   );
 }

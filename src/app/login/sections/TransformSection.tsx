@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useInView, useReducedMotion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
+import { useMotionPreference } from "@/app/login/hooks/use-motion-preference";
 import { Database, GitBranch, LineChart } from "lucide-react";
 import { scrollRevealVariants, scrollRevealTransition } from "@/components/foundation/motion/presets";
 
@@ -29,7 +30,7 @@ const pillars = [
 export function TransformSection() {
     const ref = useRef<HTMLElement>(null);
     const isInView = useInView(ref, { once: true, margin: "-80px" });
-    const reduceMotion = useReducedMotion();
+    const reduceMotion = useMotionPreference();
 
     return (
         <section ref={ref} className="py-24 lg:py-32 bg-surface-inset">

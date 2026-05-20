@@ -45,7 +45,7 @@ export function StickyPageHeader({
             <div
                 data-scrolled={scrolled || undefined}
                 className={cn(
-                    "sticky top-0 z-30 -mx-2 -mt-2 bg-surface-canvas/88 px-2 pt-2 pb-3 backdrop-blur-xl transition-all duration-200",
+                    "sticky top-0 z-30 -mx-2 -mt-2 bg-surface-canvas/94 px-2 pt-2 pb-3 backdrop-blur-md transition-all duration-150",
                     scrolled
                         ? cn(
                             "border-b premium-border shadow-[0_1px_0_color-mix(in_oklab,var(--border)_62%,transparent)]",

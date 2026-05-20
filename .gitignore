@@ -50,3 +50,13 @@ supabase/.env
 next-env.d.ts
 
 .vercel
+
+# legacy data + templates (must never be committed or publicly served)
+/public/*.sql
+/public/*.xlsx
+/public/*.xls
+/public/~$*
+# legacy migration outputs
+/scripts/migration/legacy-hris/out/
+/scripts/migration/legacy-hris/reports/
+/scripts/output/

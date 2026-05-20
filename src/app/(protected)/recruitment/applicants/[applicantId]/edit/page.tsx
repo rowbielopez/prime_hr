@@ -28,6 +28,7 @@ export default async function EditApplicantPage({ params }: { params: Promise<{ 
       />
       <ApplicantForm
         mode="edit"
+        applicantId={applicantId}
         initialValue={{
           firstName: detail.firstName,
           middleName: detail.middleName,

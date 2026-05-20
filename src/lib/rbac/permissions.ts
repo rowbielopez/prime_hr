@@ -20,6 +20,15 @@ export type AppPermission =
   | "audit.logs.read"
   | "employee.records.read"
   | "employee.records.write"
+  | "pds.self.read"
+  | "pds.self.write"
+  | "pds.review.read"
+  | "pds.review.write"
+  | "pds.generate"
+  | "pds.audit.read"
+  | "migration.legacy.read"
+  | "migration.legacy.execute"
+  | "migration.legacy.review"
   | "learning.read"
   | "learning.write"
   | "learning.access"
@@ -64,6 +73,15 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
     "audit.logs.read",
     "employee.records.read",
     "employee.records.write",
+    "pds.self.read",
+    "pds.self.write",
+    "pds.review.read",
+    "pds.review.write",
+    "pds.generate",
+    "pds.audit.read",
+    "migration.legacy.read",
+    "migration.legacy.execute",
+    "migration.legacy.review",
     "learning.read",
     "learning.write",
     "learning.access",
@@ -106,6 +124,15 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
     "audit.logs.read",
     "employee.records.read",
     "employee.records.write",
+    "pds.self.read",
+    "pds.self.write",
+    "pds.review.read",
+    "pds.review.write",
+    "pds.generate",
+    "pds.audit.read",
+    "migration.legacy.read",
+    "migration.legacy.execute",
+    "migration.legacy.review",
     "learning.read",
     "learning.write",
     "learning.access",
@@ -142,6 +169,11 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
     "compliance.dashboard.read",
     "employee.records.read",
     "employee.records.write",
+    "pds.self.read",
+    "pds.self.write",
+    "pds.review.read",
+    "pds.review.write",
+    "pds.generate",
     "learning.read",
     "learning.write",
     "learning.access",
@@ -174,6 +206,9 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
     "compliance.evidence.write",
     "compliance.dashboard.read",
     "employee.records.read",
+    "pds.self.read",
+    "pds.self.write",
+    "pds.review.read",
     "learning.read",
     "learning.access",
     "learning.reports.read",
@@ -198,6 +233,7 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
     "learning.competencies.read",
     "learning.competencies.assess.read",
     "performance.read",
+    "pds.review.read",
     "rewards.read",
     "rewards.nomination.read",
     "rewards.nomination.review",
@@ -205,9 +241,8 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
   ],
   employee: [
     "dashboard.read",
-    "compliance.evidence.read",
-    "compliance.dashboard.read",
-    "employee.records.read",
+    "pds.self.read",
+    "pds.self.write",
     "learning.access",
     "learning.competencies.assess.read",
     "performance.read",

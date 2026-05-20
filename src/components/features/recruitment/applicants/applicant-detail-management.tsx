@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/foundation";
+import { ConvertToEmployeeDialog } from "@/components/features/recruitment/applicants/convert-to-employee-dialog";
+import { StageChangeDialog } from "@/components/features/recruitment/applicants/stage-change-dialog";
 import type { ApplicantDetail, ApplicationRecord, ApplicationStatus } from "@/features/recruitment/applicants/types";
 import { applicationCreateSchema, applicationStatusSchema } from "@/features/recruitment/applicants/schemas/application-form.schema";
 import {
@@ -188,15 +190,27 @@ export function ApplicantDetailManagement({
               {detail.email ?? "No email"} · {detail.mobileNo ?? "No mobile"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusBadge
               tone={detail.status === "hired" ? "active" : detail.status === "screening" || detail.status === "shortlisted" ? "pending" : detail.status === "rejected" || detail.status === "withdrawn" ? "inactive" : "info"}
               label={detail.status}
             />
+            {detail.convertedEmployeeId ? (
+              <StatusBadge tone="active" label="Converted" />
+            ) : null}
             {canEditApplicant ? (
-              <Button size="sm" variant="outline" onClick={() => router.push(`/recruitment/applicants/${detail.id}/edit`)}>
-                Edit Applicant
-              </Button>
+              <>
+                <StageChangeDialog
+                  applicantId={detail.id}
+                  currentStatus={detail.status}
+                  alreadyConverted={Boolean(detail.convertedEmployeeId)}
+                  disabled={isPending}
+                />
+                <ConvertToEmployeeDialog applicant={detail} disabled={isPending} />
+                <Button size="sm" variant="outline" onClick={() => router.push(`/recruitment/applicants/${detail.id}/edit`)}>
+                  Edit Applicant
+                </Button>
+              </>
             ) : null}
           </div>
         </div>

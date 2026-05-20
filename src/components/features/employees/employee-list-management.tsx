@@ -4,23 +4,20 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/foundation";
 import { DataTableWrapper } from "@/components/foundation/data/data-table-wrapper";
 import { AdminDataTable, AdminStatusChip } from "@/components/foundation/data/admin-data-table";
 import { createAdminColumns, createRowActions } from "@/components/foundation/data/admin-data-table.helpers";
 import { useAdminTableState } from "@/components/foundation/data/use-admin-table-state";
 import { ClearFiltersButton, FilterSelect } from "@/components/foundation/data/filter-controls";
-import { EmployeeFormFields } from "@/components/features/employees/employee-form-fields";
+import { CreateEmployeeDialog } from "@/components/features/employees/create-employee-dialog";
 import type {
   EmployeeCampusOption,
   EmployeeListItem,
   EmployeeOfficeOption,
 } from "@/features/employees/types";
-import { employeeFormSchema, getInitialEmployeeFormState, type EmployeeFormInput } from "@/features/employees/schemas/employee-form.schema";
 import {
   archiveEmployeeAction,
-  createEmployeeAction,
   softDeleteEmployeeAction,
 } from "@/features/employees/actions";
 
@@ -61,11 +58,10 @@ const employmentStatusOptions = [
 
 export function EmployeeListManagement({ employees, campuses, offices }: EmployeeListManagementProps) {
   const router = useRouter();
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingEmployeeAction | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [formState, setFormState] = useState<EmployeeFormInput>(() => getInitialEmployeeFormState());
 
   const tableState = useAdminTableState<EmployeeListItem>({
     rows: employees,
@@ -93,6 +89,7 @@ export function EmployeeListManagement({ employees, campuses, offices }: Employe
     (row) => row.id,
     () => [
       { key: "view-details", label: "View Details" },
+      { key: "view-pds", label: "View PDS" },
       { key: "archive", label: "End employment (mark separated)" },
       { key: "soft-delete", label: "Remove from directory", destructive: true },
     ]
@@ -135,6 +132,10 @@ export function EmployeeListManagement({ employees, campuses, offices }: Employe
       router.push(`/employees/${input.rowKey}`);
       return;
     }
+    if (input.actionKey === "view-pds") {
+      router.push(`/employees/${input.rowKey}/pds`);
+      return;
+    }
     if (input.actionKey === "archive") {
       setPendingAction({
         rowKey: input.rowKey,
@@ -154,29 +155,6 @@ export function EmployeeListManagement({ employees, campuses, offices }: Employe
     }
   }
 
-  function submitCreate() {
-    const parsed = employeeFormSchema.safeParse(formState);
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Invalid employee details.");
-      return;
-    }
-    startTransition(async () => {
-      const result = await createEmployeeAction(parsed.data);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success("Employee created.");
-      setDialogOpen(false);
-      setFormState(getInitialEmployeeFormState());
-      if (result.employeeId) {
-        router.push(`/employees/${result.employeeId}`);
-      } else {
-        router.refresh();
-      }
-    });
-  }
-
   return (
     <>
       <DataTableWrapper
@@ -185,10 +163,7 @@ export function EmployeeListManagement({ employees, campuses, offices }: Employe
         actions={
           <Button
             size="sm"
-            onClick={() => {
-              setFormState(getInitialEmployeeFormState());
-              setDialogOpen(true);
-            }}
+            onClick={() => setCreateDialogOpen(true)}
           >
             New Employee
           </Button>
@@ -226,23 +201,12 @@ export function EmployeeListManagement({ employees, campuses, offices }: Employe
         />
       </DataTableWrapper>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Create Employee</DialogTitle>
-            <DialogDescription>Complete master data. Email must be unique among active records and is used to match sign-in accounts.</DialogDescription>
-          </DialogHeader>
-          <EmployeeFormFields formState={formState} setFormState={setFormState} campuses={campuses} offices={offices} />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button onClick={submitCreate} disabled={isPending}>
-              Create Employee
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateEmployeeDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        campuses={campuses}
+        offices={offices}
+      />
 
       <ConfirmDialog
         open={confirmDialogOpen}

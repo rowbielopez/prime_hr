@@ -7,9 +7,11 @@ import type { InterviewRecordInput, ScreeningResultInput } from "@/features/recr
 import type {
   ApplicantDetail,
   ApplicantListItem,
+  ApplicantStatus,
   ApplicationRecord,
   ApplicationStatus,
   ApplicationStatusHistoryItem,
+  DuplicateApplicantMatch,
   InterviewRecord,
   ScreeningResult,
 } from "@/features/recruitment/applicants/types";
@@ -26,6 +28,7 @@ type ApplicantRow = {
   office_id: string | null;
   status: ApplicantListItem["status"];
   notes: string | null;
+  converted_employee_id: string | null;
   updated_at: string;
   campus: { name: string } | Array<{ name: string }> | null;
   office: { name: string } | Array<{ name: string }> | null;
@@ -65,7 +68,7 @@ export async function listApplicants(context?: AuthorizationContext): Promise<Ap
   const supabase = await createSupabaseServerClient();
   const baseQuery = supabase
     .from("recruitment_applicants")
-    .select("id, first_name, middle_name, last_name, suffix, email, mobile_no, campus_id, office_id, status, updated_at, campus:campuses(name), office:offices(name)")
+    .select("id, first_name, middle_name, last_name, suffix, email, mobile_no, campus_id, office_id, status, converted_employee_id, updated_at, campus:campuses(name), office:offices(name)")
     .is("deleted_at", null)
     .order("updated_at", { ascending: false });
   const { data, error } = await applyAuthorizationScope(baseQuery, context);
@@ -98,6 +101,7 @@ export async function listApplicants(context?: AuthorizationContext): Promise<Ap
     officeName: resolveName(row.office),
     status: row.status,
     applicationsCount: countMap.get(row.id) ?? 0,
+    convertedEmployeeId: row.converted_employee_id,
     updatedAt: row.updated_at,
   }));
 }
@@ -106,7 +110,7 @@ export async function getApplicantById(applicantId: string, context?: Authorizat
   const supabase = await createSupabaseServerClient();
   const baseQuery = supabase
     .from("recruitment_applicants")
-    .select("id, first_name, middle_name, last_name, suffix, email, mobile_no, campus_id, office_id, status, notes, updated_at, campus:campuses(name), office:offices(name)")
+    .select("id, first_name, middle_name, last_name, suffix, email, mobile_no, campus_id, office_id, status, notes, converted_employee_id, updated_at, campus:campuses(name), office:offices(name)")
     .eq("id", applicantId)
     .is("deleted_at", null);
   const { data, error } = await applyAuthorizationScope(baseQuery, context).maybeSingle();
@@ -142,6 +146,7 @@ export async function getApplicantById(applicantId: string, context?: Authorizat
     officeName: resolveName(row.office),
     status: row.status,
     notes: row.notes,
+    convertedEmployeeId: row.converted_employee_id,
     updatedAt: row.updated_at,
     applications,
     screeningResults,
@@ -179,6 +184,16 @@ export async function updateApplicant(applicantId: string, input: ApplicantFormI
     .from("recruitment_applicants")
     .update(buildApplicantPayload(input) as never)
     .eq("id", applicantId);
+  return { ok: !error, error: error?.message };
+}
+
+export async function updateApplicantStatus(applicantId: string, status: ApplicantStatus) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("recruitment_applicants")
+    .update({ status } as never)
+    .eq("id", applicantId)
+    .is("deleted_at", null);
   return { ok: !error, error: error?.message };
 }
 
@@ -388,3 +403,139 @@ async function listApplicationStatusHistoryByApplicationIds(
     changedAt: row.created_at,
   }));
 }
+
+// ── Duplicate detection ──────────────────────────────────────────────────────
+
+function normalizeMobile(value: string) {
+  return value.replace(/\D+/g, "");
+}
+
+export async function findPotentialDuplicateApplicants(
+  input: { email?: string | null; mobileNo?: string | null; excludeApplicantId?: string | null },
+  context?: AuthorizationContext
+): Promise<DuplicateApplicantMatch[]> {
+  const email = normalizeNullable(input.email)?.toLowerCase() ?? null;
+  const mobileDigits = input.mobileNo ? normalizeMobile(input.mobileNo) : "";
+  if (!email && mobileDigits.length < 7) return [];
+
+  const supabase = await createSupabaseServerClient();
+  const baseQuery = supabase
+    .from("recruitment_applicants")
+    .select(
+      "id, first_name, middle_name, last_name, suffix, email, mobile_no, status, campus:campuses(name), applications:recruitment_applications(updated_at, vacancy:recruitment_vacancies(title))"
+    )
+    .is("deleted_at", null)
+    .limit(5);
+
+  let scopedQuery = baseQuery;
+  if (email) {
+    scopedQuery = scopedQuery.ilike("email", email);
+  }
+  // We can't easily do OR with PostgREST + normalized digits, so we run email-first
+  // then mobile suffix-match as a separate query when email yielded nothing.
+  const { data, error } = await applyAuthorizationScope(scopedQuery, context);
+  let rows = !error && data ? (data as MatchRow[]) : [];
+
+  if (rows.length === 0 && mobileDigits.length >= 7) {
+    const tail = mobileDigits.slice(-9);
+    const mobQuery = supabase
+      .from("recruitment_applicants")
+      .select(
+        "id, first_name, middle_name, last_name, suffix, email, mobile_no, status, campus:campuses(name), applications:recruitment_applications(updated_at, vacancy:recruitment_vacancies(title))"
+      )
+      .is("deleted_at", null)
+      .ilike("mobile_no", `%${tail}%`)
+      .limit(5);
+    const { data: mobData, error: mobErr } = await applyAuthorizationScope(mobQuery, context);
+    if (!mobErr && mobData) rows = mobData as MatchRow[];
+  }
+
+  const excluded = input.excludeApplicantId ?? null;
+  return rows
+    .filter((row) => row.id !== excluded)
+    .map((row) => {
+      const applications = (row.applications ?? []) as Array<{ updated_at: string; vacancy: { title: string } | Array<{ title: string }> | null }>;
+      const latest = applications
+        .slice()
+        .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))[0];
+      const latestTitle = latest
+        ? Array.isArray(latest.vacancy)
+          ? latest.vacancy[0]?.title ?? null
+          : latest.vacancy?.title ?? null
+        : null;
+      return {
+        id: row.id,
+        fullName: fullName({
+          firstName: row.first_name,
+          middleName: row.middle_name,
+          lastName: row.last_name,
+          suffix: row.suffix,
+        }),
+        email: row.email,
+        mobileNo: row.mobile_no,
+        status: row.status,
+        campusName: resolveName(row.campus) ?? "Unknown",
+        latestTargetPosition: latestTitle,
+      };
+    });
+}
+
+type MatchRow = {
+  id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
+  suffix: string | null;
+  email: string | null;
+  mobile_no: string | null;
+  status: ApplicantListItem["status"];
+  campus: { name: string } | Array<{ name: string }> | null;
+  applications: Array<{ updated_at: string; vacancy: { title: string } | Array<{ title: string }> | null }> | null;
+};
+
+// ── Applicant -> Employee conversion ─────────────────────────────────────────
+
+export async function getApplicantConversionState(
+  applicantId: string
+): Promise<{ status: ApplicantListItem["status"]; convertedEmployeeId: string | null; email: string | null } | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("recruitment_applicants")
+    .select("status, converted_employee_id, email")
+    .eq("id", applicantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as { status: ApplicantListItem["status"]; converted_employee_id: string | null; email: string | null };
+  return {
+    status: row.status,
+    convertedEmployeeId: row.converted_employee_id,
+    email: row.email,
+  };
+}
+
+export async function findActiveEmployeeByEmail(email: string): Promise<{ id: string } | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("employees")
+    .select("id")
+    .ilike("email", email.trim())
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as { id: string };
+}
+
+export async function linkApplicantToEmployeeAndMarkHired(
+  applicantId: string,
+  employeeId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("recruitment_applicants")
+    .update({ converted_employee_id: employeeId, status: "hired" } as never)
+    .eq("id", applicantId);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+

@@ -1,5 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { DashboardMetricCard } from "@/components/foundation/dashboard/dashboard-metric-card";
+import { ContentSection } from "@/components/foundation/page/content-section";
+import { cn } from "@/lib/utils";
 import type {
   RewardsApprovalTurnaroundMonthlyRow,
   RewardsApprovalTurnaroundSummary,
@@ -21,26 +25,29 @@ export function RewardsReportsDashboard({
   const periodLabel = period.from || period.to ? `${period.from ?? "Any"} to ${period.to ?? "Any"}` : "All time";
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border p-4">
+      <ContentSection>
         <form className="grid gap-3 md:grid-cols-4">
           <label className="space-y-1 text-sm">
-            <span>From date</span>
-            <input name="from" type="date" defaultValue={period.from ?? ""} className="h-9 w-full rounded-md border px-3" />
+            <span className="font-medium text-foreground">From date</span>
+            <Input name="from" type="date" defaultValue={period.from ?? ""} className="h-9" />
           </label>
           <label className="space-y-1 text-sm">
-            <span>To date</span>
-            <input name="to" type="date" defaultValue={period.to ?? ""} className="h-9 w-full rounded-md border px-3" />
+            <span className="font-medium text-foreground">To date</span>
+            <Input name="to" type="date" defaultValue={period.to ?? ""} className="h-9" />
           </label>
           <div className="md:col-span-2 flex items-end gap-2">
-            <button type="submit" className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">
+            <Button type="submit" size="lg">
               Apply period
-            </button>
-            <a href="/rewards/reports" className="h-9 rounded-md border px-4 text-sm inline-flex items-center">
+            </Button>
+            <a
+              href="/rewards/reports"
+              className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+            >
               Clear
             </a>
           </div>
         </form>
-      </div>
+      </ContentSection>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <DashboardMetricCard label="Records considered" value={String(approvalSummary.consideredCount)} trend={periodLabel} />

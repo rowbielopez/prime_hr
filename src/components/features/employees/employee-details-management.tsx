@@ -23,7 +23,7 @@ import type {
 } from "@/features/employees/types";
 import { employeeFormSchema, type EmployeeFormInput } from "@/features/employees/schemas/employee-form.schema";
 import { employeeDetailToFormInput } from "@/features/employees/employee-mappers";
-import { updateEmployeeAction } from "@/features/employees/actions";
+import { updateEmployeeAction, linkAppUserToEmployeeAction, relinkAppUserByEmailAction, unlinkAppUserFromEmployeeAction } from "@/features/employees/actions";
 
 type EmployeeDetailsManagementProps = {
   employee: EmployeeDetail;
@@ -31,7 +31,31 @@ type EmployeeDetailsManagementProps = {
   offices: EmployeeOfficeOption[];
   linkedAppUser: LinkedAppUserSummary | null;
   documents: EmployeeDocumentListItem[];
+  isSuperAdmin: boolean;
 };
+
+function LinkAccountButton({ employeeId, hasEmail }: { employeeId: string; hasEmail: boolean }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  function handleLink() {
+    startTransition(async () => {
+      const result = await linkAppUserToEmployeeAction(employeeId);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Account linked successfully.");
+      router.refresh();
+    });
+  }
+
+  return (
+    <Button size="sm" disabled={!hasEmail || isPending} onClick={handleLink}>
+      {isPending ? "Linking…" : "Link Account by Email"}
+    </Button>
+  );
+}
 
 export function EmployeeDetailsManagement({
   employee,
@@ -39,10 +63,13 @@ export function EmployeeDetailsManagement({
   offices,
   linkedAppUser,
   documents,
+  isSuperAdmin,
 }: EmployeeDetailsManagementProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [formState, setFormState] = useState<EmployeeFormInput>(() => employeeDetailToFormInput(employee));
+  const [showRelinkForm, setShowRelinkForm] = useState(false);
+  const [relinkEmail, setRelinkEmail] = useState("");
 
   useEffect(() => {
     setFormState(employeeDetailToFormInput(employee));
@@ -86,14 +113,26 @@ export function EmployeeDetailsManagement({
 
         {emailChanged ? (
           <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
-            You changed the work email. Sign-in provisioning matches accounts to employees by email; update HR records elsewhere if needed.
+            The employee email was updated. If this email is linked to a sign-in account, the linked account may need to be updated separately.
           </p>
         ) : null}
 
         <div className="mt-6">
-          <EmployeeFormFields formState={formState} setFormState={setFormState} campuses={campuses} offices={offices} />
+          <EmployeeFormFields formState={formState} setFormState={setFormState} campuses={campuses} offices={offices} defaultExpanded={true} emailReadOnly={!isSuperAdmin} />
         </div>
         <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t pt-4">
+          <Link
+            href={`/employees/${employee.id}/pds`}
+            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            View PDS
+          </Link>
+          <Link
+            href={`/service-records/${employee.id}`}
+            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Service Record
+          </Link>
           <Link
             href={`/employees/${employee.id}/training`}
             className="text-sm font-medium text-primary underline-offset-4 hover:underline"
@@ -112,21 +151,88 @@ export function EmployeeDetailsManagement({
           When this employee signs in with Google, the account can be matched by email and linked here for access and scope.
         </p>
         {linkedAppUser ? (
-          <dl className="mt-4 grid gap-2 text-sm md:grid-cols-2">
-            <div>
-              <dt className="text-muted-foreground">Email</dt>
-              <dd className="font-medium">{linkedAppUser.email}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Account status</dt>
-              <dd className="font-medium capitalize">
-                {linkedAppUser.status}
-                {linkedAppUser.isActive ? "" : " (inactive flag)"}
-              </dd>
-            </div>
-          </dl>
+          <div className="mt-4 space-y-4">
+            <dl className="grid gap-2 text-sm md:grid-cols-2">
+              <div>
+                <dt className="text-muted-foreground">Email</dt>
+                <dd className="font-medium">{linkedAppUser.email}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Account status</dt>
+                <dd className="font-medium capitalize">
+                  {linkedAppUser.status}
+                  {linkedAppUser.isActive ? "" : " (inactive flag)"}
+                </dd>
+              </div>
+            </dl>
+            {showRelinkForm ? (
+              <div className="rounded-md border bg-muted/40 p-3 space-y-3">
+                <p className="text-sm font-medium">Change linked account</p>
+                <p className="text-xs text-muted-foreground">Enter the Google sign-in email of the account you want to link to this employee. The person must have signed in at least once.</p>
+                <div className="flex gap-2">
+                  <input
+                    className="h-9 flex-1 rounded-md border bg-background px-3 text-sm"
+                    type="email"
+                    placeholder="new.account@csu.edu.ph"
+                    value={relinkEmail}
+                    onChange={(e) => setRelinkEmail(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Escape") { setShowRelinkForm(false); setRelinkEmail(""); } }}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={isPending || !relinkEmail.trim()}
+                    onClick={() => {
+                      startTransition(async () => {
+                        const result = await relinkAppUserByEmailAction(employee.id, relinkEmail);
+                        if (!result.ok) { toast.error(result.error); return; }
+                        toast.success("Account relinked successfully.");
+                        setShowRelinkForm(false);
+                        setRelinkEmail("");
+                        router.refresh();
+                      });
+                    }}
+                  >
+                    {isPending ? "Saving…" : "Save"}
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={isPending} onClick={() => { setShowRelinkForm(false); setRelinkEmail(""); }}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setShowRelinkForm(true); setRelinkEmail(""); }}>
+                  Change Account
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive border-destructive/40"
+                  disabled={isPending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      const result = await unlinkAppUserFromEmployeeAction(employee.id);
+                      if (!result.ok) { toast.error(result.error); return; }
+                      toast.success("Account unlinked.");
+                      router.refresh();
+                    });
+                  }}
+                >
+                  {isPending ? "Unlinking…" : "Unlink Account"}
+                </Button>
+              </div>
+            )}
+          </div>
         ) : (
-          <p className="mt-4 text-sm text-muted-foreground">No linked app user (employee_id) for this record.</p>
+          <div className="mt-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              No linked system account. The account is matched automatically by email at sign-in.
+              {employee.email ? " Click below to link the account with email " : " Add an employee email first, then use this button to link."}
+              {employee.email ? <span className="font-medium"> {employee.email}</span> : null}
+              {employee.email ? "." : null}
+            </p>
+            <LinkAccountButton employeeId={employee.id} hasEmail={!!employee.email} />
+          </div>
         )}
       </section>
 

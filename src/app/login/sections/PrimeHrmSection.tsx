@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useInView, useReducedMotion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
+import { useMotionPreference } from "@/app/login/hooks/use-motion-preference";
 import { Check } from "lucide-react";
 import { scrollRevealVariants, scrollRevealTransition } from "@/components/foundation/motion/presets";
 
@@ -36,7 +37,7 @@ const areas = [
 export function PrimeHrmSection() {
     const ref = useRef<HTMLElement>(null);
     const isInView = useInView(ref, { once: true, margin: "-80px" });
-    const reduceMotion = useReducedMotion();
+    const reduceMotion = useMotionPreference();
 
     return (
         <section
@@ -83,7 +84,7 @@ export function PrimeHrmSection() {
                             <span style={{ color: "var(--brand-gold)" }}>Excellence</span>
                         </h2>
                         <p className="text-white/65 text-lg leading-[1.72] mb-10">
-                            CSU PRIME-HR is purpose-built around the Civil Service Commission's
+                            CSU PRIME-HR is purpose-built around the Civil Service Commission&apos;s
                             PRIME-HRM framework — digitizing every HR sub-system, tracking compliance
                             evidence, and generating audit-ready documentation for all five areas.
                         </p>

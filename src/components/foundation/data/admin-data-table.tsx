@@ -155,7 +155,10 @@ export function AdminDataTable<RowT>({
                 const rowKey = getRowKey(row);
                 const rowActions = rowActionsByRowKey?.[rowKey] ?? [];
                 return (
-                  <TableRow key={rowKey} className="hover:shadow-[inset_3px_0_0_var(--primary)]">
+                  <TableRow
+                    key={rowKey}
+                    className="group/row transition-colors hover:bg-row-hover focus-within:bg-row-hover focus-within:shadow-[inset_2px_0_0_var(--foreground)]"
+                  >
                     {columns.map((column) => (
                       <TableCell key={`${column.key}-${rowKey}`} className={cn(densityCellClass, column.className)}>
                         {column.cell(row)}
@@ -197,7 +200,7 @@ export function AdminDataTable<RowT>({
             </TableBody>
           </Table>
 
-          <div className="flex flex-col gap-3 rounded-xl border premium-border bg-surface-inset/45 px-3 py-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 rounded-lg border premium-border bg-surface-inset/45 px-3 py-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <p>{paginationSummary}</p>
               {onPageSizeChange && pageSize ? (

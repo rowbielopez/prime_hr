@@ -38,6 +38,13 @@ type WorkspaceNavSection = Omit<AppNavGroup, "items"> & {
 
 const WORKSPACE_NAV_SECTIONS: WorkspaceNavSection[] = [
   {
+    title: "My Workspace",
+    description: "Your profile, PDS, documents, and account",
+    icon: "user-round",
+    moduleColor: "people",
+    match: (item) => item.href === "/me" || item.href.startsWith("/me/"),
+  },
+  {
     title: "Command Center",
     description: "Overview, alerts, and operational pulse",
     icon: "layout-dashboard",
@@ -54,6 +61,7 @@ const WORKSPACE_NAV_SECTIONS: WorkspaceNavSection[] = [
     moduleColor: "people",
     match: (item) =>
       item.href.startsWith("/employees") ||
+      item.href.startsWith("/pds") ||
       item.href.includes("campus") ||
       item.href.includes("offices"),
   },

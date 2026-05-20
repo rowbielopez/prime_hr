@@ -1,8 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { officeBelongsToCampus } from "@/features/admin/organization/repository/scope.repository";
 import type { EmployeeFormInput } from "@/features/employees/schemas/employee-form.schema";
 import { employeeSexValues, type EmployeeSexValue } from "@/features/employees/schemas/employee-form.schema";
 import type { AuthorizationContext } from "@/features/auth/types";
+import type { PossibleDuplicateEmployee } from "@/features/employees/types";
 import type {
   EmployeeCampusOption,
   EmployeeDetail,
@@ -41,6 +43,7 @@ type EmployeeRow = {
   emergency_contact_phone: string | null;
   present_address: string | null;
   permanent_address: string | null;
+  cabinet_no: string | null;
   external_ref: string | null;
   campus: { name: string } | Array<{ name: string }> | null;
   office: { name: string } | Array<{ name: string }> | null;
@@ -99,6 +102,7 @@ function mapRowToDetail(row: EmployeeRow): EmployeeDetail {
     emergencyContactPhone: row.emergency_contact_phone,
     presentAddress: row.present_address,
     permanentAddress: row.permanent_address,
+    cabinetNo: row.cabinet_no,
     externalRef: row.external_ref,
   };
 }
@@ -109,17 +113,29 @@ function mapRowToDetail(row: EmployeeRow): EmployeeDetail {
  */
 export async function listEmployees(): Promise<EmployeeListItem[]> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("employees")
-    .select(
-      "id, employee_no, first_name, middle_name, last_name, suffix, email, campus_id, office_id, employment_status, position_title, campus:campuses(name), office:offices(name)"
-    )
-    .is("deleted_at", null)
-    .order("last_name", { ascending: true });
-  if (error) return [];
+  // Supabase hosted PostgREST enforces a hard max_rows=1000 cap regardless of
+  // the client-specified limit. Paginate in 1000-row pages to fetch all records.
+  const PAGE_SIZE = 1000;
+  const COLS = "id, employee_no, first_name, middle_name, last_name, suffix, email, campus_id, office_id, employment_status, position_title, campus:campuses(name), office:offices(name)";
+  const allRows: EmployeeRow[] = [];
+  let page = 0;
 
-  const rows = (data ?? []) as EmployeeRow[];
-  return rows.map((row) => ({
+  while (true) {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from("employees")
+      .select(COLS)
+      .is("deleted_at", null)
+      .order("last_name", { ascending: true })
+      .range(from, to);
+    if (error || !data || data.length === 0) break;
+    allRows.push(...(data as EmployeeRow[]));
+    if (data.length < PAGE_SIZE) break;
+    page++;
+  }
+
+  return allRows.map((row) => ({
     id: row.id,
     employeeNo: row.employee_no,
     fullName: displayName({
@@ -143,7 +159,7 @@ export async function getEmployeeById(employeeId: string): Promise<EmployeeDetai
   const { data, error } = await supabase
     .from("employees")
     .select(
-      "id, employee_no, first_name, middle_name, last_name, suffix, birth_date, sex, email, mobile_no, campus_id, office_id, position_title, plantilla_item_no, employment_status, date_hired, civil_status, tin, gsis_no, philhealth_no, pagibig_no, employment_type, date_separated, separation_reason, emergency_contact_name, emergency_contact_phone, present_address, permanent_address, external_ref, campus:campuses(name), office:offices(name)"
+      "id, employee_no, first_name, middle_name, last_name, suffix, birth_date, sex, email, mobile_no, campus_id, office_id, position_title, plantilla_item_no, employment_status, date_hired, civil_status, tin, gsis_no, philhealth_no, pagibig_no, employment_type, date_separated, separation_reason, emergency_contact_name, emergency_contact_phone, present_address, permanent_address, cabinet_no, external_ref, campus:campuses(name), office:offices(name)"
     )
     .eq("id", employeeId)
     .is("deleted_at", null)
@@ -248,12 +264,18 @@ function buildEmployeeWritePayload(input: EmployeeFormInput) {
     emergency_contact_phone: normalizeNullable(input.emergencyContactPhone),
     present_address: normalizeNullable(input.presentAddress),
     permanent_address: normalizeNullable(input.permanentAddress),
+    cabinet_no: normalizeNullable(input.cabinetNo),
     external_ref: normalizeNullable(input.externalRef),
   };
 }
 
-function isUniqueEmailViolation(message: string): boolean {
-  return message.includes("uq_employees_email_normalized_active") || message.includes("duplicate key");
+function classifyUniqueViolation(message: string): "email" | "employee_no" | "other_duplicate" | null {
+  if (message.includes("uq_employees_email_normalized_active")) return "email";
+  // Postgres auto-names the unique column constraint from 0002_foundation_tables.sql
+  if (message.includes("employees_employee_no_key")) return "employee_no";
+  // Fallback: any other duplicate key error
+  if (message.includes("duplicate key")) return "other_duplicate";
+  return null;
 }
 
 export async function createEmployee(input: EmployeeFormInput, actorAppUserId: string | null) {
@@ -268,9 +290,16 @@ export async function createEmployee(input: EmployeeFormInput, actorAppUserId: s
   return {
     ok: !error,
     error: error
-      ? isUniqueEmailViolation(error.message)
-        ? "An employee with this email already exists."
-        : error.message
+      ? (() => {
+        const kind = classifyUniqueViolation(error.message);
+        if (kind === "employee_no")
+          return `Employee number "${input.employeeNo.trim()}" is already in use. The record may belong to a campus outside your access. Contact your System Administrator.`;
+        if (kind === "email")
+          return "An employee with this email already exists.";
+        if (kind === "other_duplicate")
+          return "A duplicate record was detected. Check employee number, email, or contact details.";
+        return error.message;
+      })()
       : undefined,
     employeeId: (data as { id: string } | null)?.id ?? null,
   };
@@ -286,11 +315,96 @@ export async function updateEmployee(employeeId: string, input: EmployeeFormInpu
   return {
     ok: !error,
     error: error
-      ? isUniqueEmailViolation(error.message)
-        ? "Another employee already uses this email."
-        : error.message
+      ? (() => {
+        const kind = classifyUniqueViolation(error.message);
+        if (kind === "employee_no")
+          return `Employee number "${input.employeeNo.trim()}" is already in use by another record.`;
+        if (kind === "email")
+          return "This email is already used by another active employee.";
+        if (kind === "other_duplicate")
+          return "A duplicate record was detected. Check employee number, email, or contact details.";
+        return error.message;
+      })()
       : undefined,
   };
+}
+
+export async function findPossibleDuplicates(input: {
+  employeeNo: string;
+  email: string | null | undefined;
+  firstName: string;
+  lastName: string;
+  birthDate: string | null | undefined;
+  mobileNo: string | null | undefined;
+}): Promise<PossibleDuplicateEmployee[]> {
+  const supabase = await createSupabaseServerClient();
+  // employee_no is globally unique — check it with the admin client so RLS
+  // doesn't hide conflicts from other campuses.
+  const admin = createSupabaseAdminClient();
+
+  const trimmedNo = input.employeeNo.trim();
+  const trimmedEmail = input.email?.trim().toLowerCase();
+  const trimmedMobile = input.mobileNo?.trim();
+
+  type DupRow = {
+    id: string;
+    employee_no: string;
+    first_name: string;
+    middle_name: string | null;
+    last_name: string;
+    suffix: string | null;
+    birth_date: string | null;
+    email: string | null;
+    mobile_no: string | null;
+    campus: { name: string } | Array<{ name: string }> | null;
+    office: { name: string } | Array<{ name: string }> | null;
+  };
+
+  const resultMap = new Map<string, DupRow & { reasons: string[] }>();
+
+  // 1. Check employee_no globally (bypasses RLS so cross-campus conflicts surface)
+  if (trimmedNo.length >= 2) {
+    const { data } = await admin
+      .from("employees")
+      .select("id, employee_no, first_name, middle_name, last_name, suffix, birth_date, email, mobile_no, campus:campuses(name), office:offices(name)")
+      .ilike("employee_no", trimmedNo)
+      .is("deleted_at", null)
+      .limit(5);
+    for (const row of (data ?? []) as DupRow[]) {
+      const entry = resultMap.get(row.id) ?? { ...row, reasons: [] };
+      entry.reasons.push("same employee number");
+      resultMap.set(row.id, entry);
+    }
+  }
+
+  // 2. Check email and mobile via RLS-scoped client (user's visible scope)
+  const orParts: string[] = [];
+  if (trimmedEmail) orParts.push(`email.ilike.${trimmedEmail}`);
+  if (trimmedMobile && trimmedMobile.length >= 7) orParts.push(`mobile_no.eq.${trimmedMobile}`);
+
+  if (orParts.length > 0) {
+    const { data } = await supabase
+      .from("employees")
+      .select("id, employee_no, first_name, middle_name, last_name, suffix, birth_date, email, mobile_no, campus:campuses(name), office:offices(name)")
+      .or(orParts.join(","))
+      .is("deleted_at", null)
+      .limit(5);
+    for (const row of (data ?? []) as DupRow[]) {
+      const entry = resultMap.get(row.id) ?? { ...row, reasons: [] };
+      if (trimmedEmail && row.email?.toLowerCase() === trimmedEmail) entry.reasons.push("same email");
+      if (trimmedMobile && row.mobile_no === trimmedMobile) entry.reasons.push("same mobile number");
+      resultMap.set(row.id, entry);
+    }
+  }
+
+  return Array.from(resultMap.values()).map((row) => ({
+    id: row.id,
+    employeeNo: row.employee_no,
+    fullName: displayName({ firstName: row.first_name, middleName: row.middle_name, lastName: row.last_name, suffix: row.suffix }),
+    campusName: resolveName(row.campus) ?? "Unknown",
+    officeName: resolveName(row.office),
+    matchReason: row.reasons.length > 0 ? row.reasons.join(", ") : "name or contact match",
+  }));
 }
 
 export async function archiveEmployee(employeeId: string) {

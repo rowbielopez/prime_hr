@@ -71,9 +71,9 @@ export function ConfirmDialog({
                     </span>
                     <div className="min-w-0 space-y-1">
                         <DialogTitle>{title}</DialogTitle>
-                {description ? (
-                    <DialogDescription>{description}</DialogDescription>
-                ) : null}
+                        {description ? (
+                            <DialogDescription>{description}</DialogDescription>
+                        ) : null}
                     </div>
                 </div>
             </DialogHeader>

@@ -64,6 +64,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100vh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-0 overflow-hidden rounded-2xl border premium-border bg-popover/96 text-sm text-popover-foreground shadow-premium-lg ring-1 ring-foreground/10 outline-none supports-backdrop-filter:bg-popover/88 supports-backdrop-filter:backdrop-blur-2xl",
+          "[&>:not([data-slot=dialog-header]):not([data-slot=dialog-footer]):not([data-slot=dialog-close])]:px-5 sm:[&>:not([data-slot=dialog-header]):not([data-slot=dialog-footer]):not([data-slot=dialog-close])]:px-6",
           "duration-200 ease-[var(--motion-ease)] motion-reduce:duration-0 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:slide-in-from-bottom-2 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-98",
           sizeClass,
           className
@@ -113,7 +114,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "mt-auto flex flex-col-reverse gap-2 border-t premium-border bg-surface-inset/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-6",
+        "mt-4 flex flex-col-reverse gap-2 border-t premium-border bg-surface-inset/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-6",
         className
       )}
       {...props}

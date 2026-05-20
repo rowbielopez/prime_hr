@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useInView, useReducedMotion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
+import { useMotionPreference } from "@/app/login/hooks/use-motion-preference";
 import {
     Users,
     ShieldCheck,
@@ -93,7 +94,7 @@ const features: Feature[] = [
 export function FeaturesSection() {
     const ref = useRef<HTMLElement>(null);
     const isInView = useInView(ref, { once: true, margin: "-80px" });
-    const reduceMotion = useReducedMotion();
+    const reduceMotion = useMotionPreference();
 
     return (
         <section id="features" ref={ref} className="py-24 lg:py-32 bg-surface-panel">

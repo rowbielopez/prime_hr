@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useInView, useReducedMotion } from "framer-motion";
+import Image from "next/image";
+import { motion, useInView } from "framer-motion";
+import { useMotionPreference } from "@/app/login/hooks/use-motion-preference";
 import {
     scrollRevealVariants,
     scrollRevealTransition,
@@ -17,7 +19,7 @@ const errorMessages: Record<string, string> = {
     invalid_hosted_domain:
         "Your Google Workspace hosted domain is not allowed for this system.",
     access_pending:
-        "Your account is pending administrator approval. Please contact Central HR or your campus HR officer.",
+        "Your account was registered but is not yet activated. An HR administrator must assign your role and activate your account before you can sign in.",
     unauthorized_access:
         "Your account is not yet authorized for this system. Please request role and campus assignment.",
     ambiguous_employee_match:
@@ -60,7 +62,7 @@ interface LoginSectionProps {
 export function LoginSection({ error, isLoading, onSignIn }: LoginSectionProps) {
     const ref = useRef<HTMLElement>(null);
     const isInView = useInView(ref, { once: true, margin: "-80px" });
-    const reduceMotion = useReducedMotion();
+    const reduceMotion = useMotionPreference();
     const errorMessage = getErrorMessage(error);
 
     return (
@@ -95,18 +97,20 @@ export function LoginSection({ error, isLoading, onSignIn }: LoginSectionProps) 
                     className="w-full max-w-sm glass-panel rounded-2xl p-8 border border-border/50"
                 >
                     {/* Wordmark */}
-                    <div className="flex items-center gap-2.5 mb-7">
-                        <div className="w-8 h-8 rounded-xl bg-primary shadow-premium-sm flex items-center justify-center">
-                            <svg viewBox="0 0 14 14" fill="none" className="w-4.5 h-4.5 text-primary-foreground">
-                                <path d="M7 2L11 5.5V9L7 12L3 9V5.5L7 2Z" fill="currentColor" opacity="0.9" />
-                                <path d="M7 4.5L9.5 6.5V8.5L7 10L4.5 8.5V6.5L7 4.5Z" fill="currentColor" opacity="0.35" />
-                            </svg>
-                        </div>
+                    <div className="flex items-center gap-3 mb-7">
+                        <Image
+                            src="/600x600 CSU Logo.png"
+                            alt="Cagayan State University logo"
+                            width={48}
+                            height={48}
+                            className="object-contain shrink-0"
+                            priority
+                        />
                         <div>
                             <div className="text-sm font-semibold text-foreground leading-none">
                                 CSU PRIME-HR
                             </div>
-                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                            <div className="text-[10px] text-muted-foreground mt-1">
                                 Cagayan State University
                             </div>
                         </div>

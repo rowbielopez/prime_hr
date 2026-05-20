@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FormGrid, FormSelect, FormText } from "@/components/foundation";
+import { DuplicateApplicantWarning } from "@/components/features/recruitment/applicants/duplicate-applicant-warning";
 import { applicantFormSchema, type ApplicantFormInput } from "@/features/recruitment/applicants/schemas/applicant-form.schema";
 
 const STATUS_OPTIONS: ApplicantFormInput["status"][] = ["new", "screening", "shortlisted", "hired", "rejected", "withdrawn"];
@@ -13,12 +14,13 @@ const NONE = "__none__";
 type ApplicantFormProps = {
   mode: "create" | "edit";
   initialValue: ApplicantFormInput;
+  applicantId?: string;
   campusOptions: Array<{ id: string; code: string; name: string }>;
   officeOptions: Array<{ id: string; campusId: string; code: string; name: string }>;
   onSubmit: (input: ApplicantFormInput) => Promise<{ ok: boolean; error?: string; id?: string }>;
 };
 
-export function ApplicantForm({ mode, initialValue, campusOptions, officeOptions, onSubmit }: ApplicantFormProps) {
+export function ApplicantForm({ mode, initialValue, applicantId, campusOptions, officeOptions, onSubmit }: ApplicantFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [formState, setFormState] = useState<ApplicantFormInput>(initialValue);
@@ -48,6 +50,11 @@ export function ApplicantForm({ mode, initialValue, campusOptions, officeOptions
 
   return (
     <div className="space-y-6">
+      <DuplicateApplicantWarning
+        email={formState.email ?? null}
+        mobileNo={formState.mobileNo ?? null}
+        excludeApplicantId={applicantId ?? null}
+      />
       <FormGrid columns={2}>
         <FormText
           label="First Name"

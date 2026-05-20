@@ -44,6 +44,7 @@ export type EmployeeDetail = {
   emergencyContactPhone: string | null;
   presentAddress: string | null;
   permanentAddress: string | null;
+  cabinetNo: string | null;
   externalRef: string | null;
 };
 
@@ -58,6 +59,15 @@ export type EmployeeOfficeOption = {
   campusId: string;
   code: string;
   name: string;
+};
+
+export type PossibleDuplicateEmployee = {
+  id: string;
+  employeeNo: string;
+  fullName: string;
+  campusName: string;
+  officeName: string | null;
+  matchReason: string;
 };
 
 export type LinkedAppUserSummary = {

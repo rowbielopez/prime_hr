@@ -1,6 +1,8 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import Image from "next/image";
+import { useMotionPreference } from "@/app/login/hooks/use-motion-preference";
 import { ArrowRight, Users, BarChart3, ShieldCheck } from "lucide-react";
 import {
     staggerContainerVariants,
@@ -24,7 +26,7 @@ const mockRows = [
 const mockBars = [35, 55, 42, 78, 58, 90, 64];
 
 export function HeroSection({ onSignIn, isLoading }: HeroSectionProps) {
-    const reduceMotion = useReducedMotion();
+    const reduceMotion = useMotionPreference();
 
     return (
         <section className="relative min-h-screen flex items-center overflow-hidden">
@@ -76,7 +78,13 @@ export function HeroSection({ onSignIn, isLoading }: HeroSectionProps) {
                             transition={premiumTransition}
                         >
                             <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-semibold tracking-[0.16em] uppercase border border-brand-maroon/25 text-brand-maroon bg-brand-maroon/5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-brand-maroon animate-pulse" />
+                                <Image
+                                    src="/600x600 CSU Logo.png"
+                                    alt="Cagayan State University logo"
+                                    width={16}
+                                    height={16}
+                                    className="object-contain"
+                                />
                                 Cagayan State University · PRIME-HRM
                             </span>
                         </motion.div>

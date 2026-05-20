@@ -13,6 +13,7 @@ export type ApplicantListItem = {
   officeName: string | null;
   status: ApplicantStatus;
   applicationsCount: number;
+  convertedEmployeeId: string | null;
   updatedAt: string;
 };
 
@@ -74,9 +75,20 @@ export type ApplicantDetail = {
   officeName: string | null;
   status: ApplicantStatus;
   notes: string | null;
+  convertedEmployeeId: string | null;
   updatedAt: string;
   applications: ApplicationRecord[];
   screeningResults: ScreeningResult[];
   interviews: InterviewRecord[];
   statusHistory: ApplicationStatusHistoryItem[];
+};
+
+export type DuplicateApplicantMatch = {
+  id: string;
+  fullName: string;
+  email: string | null;
+  mobileNo: string | null;
+  status: ApplicantStatus;
+  campusName: string;
+  latestTargetPosition: string | null;
 };

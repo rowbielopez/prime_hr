@@ -43,6 +43,7 @@ export default async function EmployeeDetailsPage({ params }: { params: Promise<
         offices={offices}
         linkedAppUser={linkedAppUser}
         documents={documents}
+        isSuperAdmin={context.roles.includes("super_admin")}
       />
     </div>
   );

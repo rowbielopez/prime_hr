@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthorizationContext } from "@/features/auth/types";
 import type {
   CampusOption,
+  EmployeeSearchResult,
   OfficeOption,
   RoleOption,
   UserListItem,
@@ -12,7 +13,7 @@ export async function listUsers(): Promise<UserListItem[]> {
 
   const { data: usersData, error: usersError } = await supabase
     .from("app_users")
-    .select("id, email, first_name, last_name, status, is_active, last_login_at")
+    .select("id, email, first_name, last_name, status, is_active, last_login_at, employee_id")
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
   if (usersError) return [];
@@ -25,10 +26,25 @@ export async function listUsers(): Promise<UserListItem[]> {
     status: "active" | "inactive" | "suspended";
     is_active: boolean;
     last_login_at: string | null;
+    employee_id: string | null;
   }>;
 
   const userIds = users.map((user) => user.id);
   if (userIds.length === 0) return [];
+
+  // Batch fetch linked employee data
+  const employeeIds = users.map((u) => u.employee_id).filter(Boolean) as string[];
+  const employeeById = new Map<string, { id: string; employee_no: string; first_name: string; last_name: string }>();
+  if (employeeIds.length > 0) {
+    const { data: empData } = await supabase
+      .from("employees")
+      .select("id, employee_no, first_name, last_name")
+      .in("id", employeeIds)
+      .is("deleted_at", null);
+    for (const emp of (empData ?? []) as Array<{ id: string; employee_no: string; first_name: string; last_name: string }>) {
+      employeeById.set(emp.id, emp);
+    }
+  }
 
   const { data: rolesData } = await supabase
     .from("user_roles")
@@ -70,9 +86,9 @@ export async function listUsers(): Promise<UserListItem[]> {
   const roleIds = activeRoles.map((role) => role.id);
   const { data: roleOfficeData } = roleIds.length
     ? await supabase
-        .from("user_role_offices")
-        .select("user_role_id, office_id, office:offices(name)")
-        .in("user_role_id", roleIds)
+      .from("user_role_offices")
+      .select("user_role_id, office_id, office:offices(name)")
+      .in("user_role_id", roleIds)
     : { data: [] };
 
   const typedRoleOfficeData = (roleOfficeData ?? []) as Array<{
@@ -98,6 +114,8 @@ export async function listUsers(): Promise<UserListItem[]> {
         : officeInfo.office
       : null;
     const fullName = `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim();
+    const employee = user.employee_id ? (employeeById.get(user.employee_id) ?? null) : null;
+    const employeeName = employee ? `${employee.first_name} ${employee.last_name}`.trim() : null;
 
     return {
       id: user.id,
@@ -119,6 +137,42 @@ export async function listUsers(): Promise<UserListItem[]> {
       isActive: user.is_active,
       status: user.status,
       lastLoginAt: user.last_login_at,
+      employeeId: user.employee_id,
+      employeeNo: employee?.employee_no ?? null,
+      employeeName: employeeName || null,
+    };
+  });
+}
+
+export async function searchEmployeesForLinking(query: string): Promise<EmployeeSearchResult[]> {
+  const supabase = await createSupabaseServerClient();
+  const q = query.trim();
+  if (!q || q.length < 2) return [];
+
+  const { data, error } = await supabase
+    .from("employees")
+    .select("id, employee_no, first_name, middle_name, last_name, email, campus:campuses(name)")
+    .or(`employee_no.ilike.%${q}%,email.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%`)
+    .is("deleted_at", null)
+    .limit(10);
+
+  if (error) return [];
+  return ((data ?? []) as Array<{
+    id: string;
+    employee_no: string;
+    first_name: string;
+    middle_name: string | null;
+    last_name: string;
+    email: string | null;
+    campus: { name: string } | Array<{ name: string }> | null;
+  }>).map((emp) => {
+    const campusInfo = emp.campus ? (Array.isArray(emp.campus) ? emp.campus[0] : emp.campus) : null;
+    return {
+      id: emp.id,
+      employeeNo: emp.employee_no,
+      fullName: [emp.first_name, emp.middle_name, emp.last_name].filter(Boolean).join(" "),
+      email: emp.email,
+      campusName: campusInfo?.name ?? null,
     };
   });
 }

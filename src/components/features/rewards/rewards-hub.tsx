@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ContentSection } from "@/components/foundation/page/content-section";
 import type { RewardDashboardSummary, RewardStatusCount } from "@/features/rewards/types";
 import { DashboardMetricCard } from "@/components/foundation/dashboard/dashboard-metric-card";
 
@@ -19,7 +20,7 @@ export function RewardsHub({
         <DashboardMetricCard label="Approved" value={String(summary.approvedNominations)} trend="Ready for awarding" />
         <DashboardMetricCard label="Awarded" value={String(summary.awardedCount)} trend="Awardee records created" />
       </div>
-      <div className="rounded-lg border p-4">
+      <ContentSection>
         <h3 className="text-sm font-medium">Nomination status distribution</h3>
         <div className="mt-3 space-y-2">
           {statusCounts.length === 0 ? (
@@ -33,7 +34,7 @@ export function RewardsHub({
             ))
           )}
         </div>
-      </div>
+      </ContentSection>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader>

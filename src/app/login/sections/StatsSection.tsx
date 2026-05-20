@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useInView, useReducedMotion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
+import { useMotionPreference } from "@/app/login/hooks/use-motion-preference";
 import { scrollRevealVariants, scrollRevealTransition } from "@/components/foundation/motion/presets";
 
 const stats = [
@@ -30,7 +31,7 @@ const stats = [
 export function StatsSection() {
     const ref = useRef<HTMLElement>(null);
     const isInView = useInView(ref, { once: true, margin: "-80px" });
-    const reduceMotion = useReducedMotion();
+    const reduceMotion = useMotionPreference();
 
     return (
         <section ref={ref} className="py-16 lg:py-20 bg-surface-canvas border-y border-border">

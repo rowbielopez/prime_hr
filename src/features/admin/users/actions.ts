@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Database } from "@/lib/db/types";
 import { writeAuditLog } from "@/features/audit/server/write-audit-log";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { userManagementSchema, type UserManagementInput } from "@/features/admin/users/schemas/user-management.schema";
 import { officeBelongsToCampus } from "@/features/admin/organization/repository/scope.repository";
 import {
@@ -11,6 +12,8 @@ import {
   getUserManagementMutationBlockedReason,
   requireUserManagementPermission,
 } from "@/features/admin/users/server/user-management-access";
+import { searchEmployeesForLinking } from "@/features/admin/users/repository/users.repository";
+import type { EmployeeSearchResult } from "@/features/admin/users/types";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -229,6 +232,162 @@ export async function toggleUserAccessAction(userId: string, isActive: boolean):
   } catch (auditError) {
     console.error("audit_log_failed", auditError);
   }
+
+  revalidatePath("/admin/users");
+  return success();
+}
+
+export async function relinkEmployeeAction(userId: string, employeeId: string | null): Promise<ActionResult> {
+  if (!userId) return failure("Invalid user ID.");
+
+  const supabase = await createSupabaseServerClient();
+  const beforeState = await loadManagedUserState(userId);
+  if (!beforeState) return failure("User not found.");
+
+  await requireUserManagementPermission({
+    campusId: beforeState.campusId ?? beforeState.primaryCampusId,
+    officeId: beforeState.officeId ?? beforeState.primaryOfficeId,
+  });
+
+  // Fetch current employee_id for audit log
+  const { data: appUserRow } = await supabase
+    .from("app_users")
+    .select("employee_id")
+    .eq("id", userId)
+    .maybeSingle();
+  const previousEmployeeId = (appUserRow as { employee_id: string | null } | null)?.employee_id ?? null;
+
+  const { error } = await supabase
+    .from("app_users")
+    .update({ employee_id: employeeId } as never)
+    .eq("id", userId);
+  if (error) return failure(error.message);
+
+  await writeAuditLog({
+    eventType: "admin.user_employee_relinked",
+    action: "relink_employee",
+    entityType: "app_users",
+    entityId: userId,
+    campusId: beforeState.primaryCampusId,
+    metadata: {
+      before_employee_id: previousEmployeeId,
+      after_employee_id: employeeId,
+    },
+  }).catch(() => undefined);
+
+  revalidatePath("/admin/users");
+  return success();
+}
+
+export async function searchEmployeesAction(query: string): Promise<EmployeeSearchResult[]> {
+  await requireUserManagementPermission({ campusId: null, officeId: null });
+  return searchEmployeesForLinking(query);
+}
+
+/**
+ * Manually provisions an app_users record for a person who has signed in with
+ * Google at least once (so an auth.users row exists) but whose provisioning
+ * failed or who needs to be created before their first successful sign-in.
+ *
+ * The function looks up the auth user by email via the secure RPC, then creates
+ * the app_users row in "inactive / needs activation" state. After this, the admin
+ * can assign a role and activate the account on the same Users page.
+ */
+export async function manualProvisionUserAction(email: string): Promise<ActionResult> {
+  const context = await requireUserManagementPermission({ campusId: null, officeId: null });
+  if (!context.isSuperAdmin && !context.roles.includes("central_hr_admin")) {
+    return failure("Only super administrators or central HR administrators can manually provision accounts.");
+  }
+
+  const trimmedEmail = email.trim().toLowerCase();
+  if (!trimmedEmail || !trimmedEmail.includes("@")) {
+    return failure("A valid email address is required.");
+  }
+
+  const admin = createSupabaseAdminClient();
+  const supabase = await createSupabaseServerClient();
+
+  // Check if already provisioned
+  const { data: existing } = await supabase
+    .from("app_users")
+    .select("id, email")
+    .eq("email", trimmedEmail)
+    .maybeSingle();
+
+  if (existing) {
+    return failure(`An account for "${trimmedEmail}" already exists in the system. Find it in the Users table below.`);
+  }
+
+  // Look up the Supabase auth user by iterating auth.admin.listUsers.
+  // We do NOT rely on the get_auth_user_id_by_email RPC (migration 0050)
+  // because that migration may not yet be applied to the remote DB.
+  let foundAuthUserId: string | null = null;
+  let page = 1;
+  const PER_PAGE = 1000;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data: listData, error: listError } = await admin.auth.admin.listUsers({ page, perPage: PER_PAGE });
+    if (listError) {
+      return failure(`Failed to search auth accounts: ${listError.message}`);
+    }
+    const match = listData.users.find((u) => u.email?.toLowerCase() === trimmedEmail);
+    if (match) {
+      foundAuthUserId = match.id;
+      break;
+    }
+    const pagination = listData as unknown as { nextPage: number | null };
+    if (!pagination.nextPage) break;
+    page++;
+  }
+
+  if (!foundAuthUserId) {
+    return failure(
+      `No Google sign-in account found for "${trimmedEmail}". ` +
+      `The person must open the login page and click "Continue with CSU Google Account" once — ` +
+      `even if they see an error. That registers their Google account. ` +
+      `Then use this button again.`
+    );
+  }
+
+  // Find matching employee by email
+  const { data: empData } = await admin
+    .from("employees")
+    .select("id, campus_id, office_id")
+    .eq("email", trimmedEmail)
+    .is("deleted_at", null)
+    .limit(1);
+
+  const emp = (empData ?? [])[0] as { id: string; campus_id: string; office_id: string | null } | undefined;
+
+  const { data: createdUser, error: insertError } = await admin
+    .from("app_users")
+    .insert({
+      auth_user_id: foundAuthUserId,
+      email: trimmedEmail,
+      status: "inactive",
+      is_active: false,
+      employee_id: emp?.id ?? null,
+      primary_campus_id: emp?.campus_id ?? null,
+      // Do NOT set primary_office_id: the validate_app_user_office_scope trigger
+      // would raise if the employee's office_id has a campus mismatch or is stale.
+      // The admin can configure the office assignment after activation.
+      primary_office_id: null,
+    } as never)
+    .select("id")
+    .single();
+
+  if (insertError || !createdUser) {
+    console.error("[manualProvision] insert failed:", insertError);
+    return failure(insertError?.message ?? "Failed to create account record.");
+  }
+
+  await writeAuditLog({
+    eventType: "admin.user_manually_provisioned",
+    action: "manual_provision",
+    entityType: "app_users",
+    entityId: (createdUser as { id: string }).id,
+    metadata: { email: trimmedEmail, matched_employee_id: emp?.id ?? null },
+  }).catch(() => undefined);
 
   revalidatePath("/admin/users");
   return success();

@@ -41,7 +41,7 @@ export function ErrorState({
                 className,
             )}
         >
-            <span className="flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+            <span className="flex size-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
                 <AlertTriangle className="size-5" />
             </span>
             <div className="space-y-1">

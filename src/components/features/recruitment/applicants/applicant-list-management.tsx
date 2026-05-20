@@ -23,10 +23,13 @@ const columns = createAdminColumns<ApplicantListItem>([
     key: "status",
     header: "Status",
     cell: (row) => (
-      <AdminStatusChip
-        tone={row.status === "hired" ? "active" : row.status === "screening" || row.status === "shortlisted" ? "pending" : row.status === "rejected" || row.status === "withdrawn" ? "inactive" : "info"}
-        label={row.status}
-      />
+      <div className="flex flex-wrap items-center gap-1">
+        <AdminStatusChip
+          tone={row.status === "hired" ? "active" : row.status === "screening" || row.status === "shortlisted" ? "pending" : row.status === "rejected" || row.status === "withdrawn" ? "inactive" : "info"}
+          label={row.status}
+        />
+        {row.convertedEmployeeId ? <AdminStatusChip tone="active" label="Converted" /> : null}
+      </div>
     ),
   },
 ]);

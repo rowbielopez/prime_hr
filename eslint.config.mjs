@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "**/next-env.d.ts",
     // Accidental nested duplicate app (`./prime-hr/` inside this repo) — avoid linting it twice
     "prime-hr/**",
+    // Design assets folder — contains CJS scripts that legitimately use require()
+    "design/**",
   ]),
 ]);
 

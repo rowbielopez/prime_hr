@@ -1,14 +1,15 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useInView, useReducedMotion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { scrollRevealVariants, scrollRevealTransition } from "@/components/foundation/motion/presets";
+import { useMotionPreference } from "@/app/login/hooks/use-motion-preference";
 
 export function CtaSection() {
     const ref = useRef<HTMLElement>(null);
     const isInView = useInView(ref, { once: true, margin: "-80px" });
-    const reduceMotion = useReducedMotion();
+    const reduceMotion = useMotionPreference();
 
     return (
         <section ref={ref} className="py-24 lg:py-32 relative overflow-hidden">
@@ -57,7 +58,7 @@ export function CtaSection() {
                         transition={{ ...scrollRevealTransition, delay: 0.07 }}
                         className="text-4xl lg:text-5xl font-semibold tracking-tight text-white leading-[1.08]"
                     >
-                        Ready to modernize CSU's HR?
+                        Ready to modernize CSU&apos;s HR?
                     </motion.h2>
 
                     <motion.p

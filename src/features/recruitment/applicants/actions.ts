@@ -19,15 +19,29 @@ import {
   type ScreeningResultInput,
 } from "@/features/recruitment/applicants/schemas/screening-and-interview.schema";
 import {
+  convertApplicantToEmployeeSchema,
+  stageChangeSchema,
+  type ConvertApplicantToEmployeeInput,
+  type StageChangeInput,
+} from "@/features/recruitment/applicants/schemas/convert-and-stage.schema";
+import {
   createInterviewRecord,
   createScreeningResult,
   createApplicant,
   createApplication,
+  findActiveEmployeeByEmail,
+  findPotentialDuplicateApplicants,
+  getApplicantById,
+  getApplicantConversionState,
   getApplicantScopeById,
   getApplicationScopeById,
+  linkApplicantToEmployeeAndMarkHired,
   updateApplicant,
+  updateApplicantStatus,
   updateApplicationStatus,
 } from "@/features/recruitment/applicants/repository/applicants.repository";
+import { createEmployee } from "@/features/employees/repository/employees.repository";
+import type { DuplicateApplicantMatch } from "@/features/recruitment/applicants/types";
 
 type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -216,3 +230,207 @@ export async function createInterviewRecordAction(input: InterviewRecordInput): 
   revalidatePath(`/recruitment/applicants/${parsed.data.applicantId}`);
   return success(result.id ?? undefined);
 }
+
+// ── Duplicate detection ──────────────────────────────────────────────────────
+
+export async function findPotentialDuplicatesAction(input: {
+  email?: string | null;
+  mobileNo?: string | null;
+  excludeApplicantId?: string | null;
+}): Promise<{ ok: true; matches: DuplicateApplicantMatch[] } | { ok: false; error: string }> {
+  try {
+    const context = await requirePermission({ permission: "recruitment.applicants.read" });
+    const matches = await findPotentialDuplicateApplicants(
+      {
+        email: input.email ?? null,
+        mobileNo: input.mobileNo ?? null,
+        excludeApplicantId: input.excludeApplicantId ?? null,
+      },
+      context
+    );
+    return { ok: true, matches };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Failed to look up duplicates." };
+  }
+}
+
+// ── Change Stage with remarks ────────────────────────────────────────────────
+
+export async function changeApplicantStageAction(input: StageChangeInput): Promise<ActionResult> {
+  const parsed = stageChangeSchema.safeParse(input);
+  if (!parsed.success) return failure(parsed.error.issues[0]?.message ?? "Invalid stage change input.");
+
+  const scope = await getApplicantScopeById(parsed.data.applicantId);
+  if (!scope) return failure("Applicant not found.");
+  await requirePermission({
+    permission: "recruitment.applicants.write",
+    campusId: scope.campusId,
+    officeId: scope.officeId,
+  });
+
+  const current = await getApplicantConversionState(parsed.data.applicantId);
+  if (!current) return failure("Applicant not found.");
+
+  if (current.status === parsed.data.status) {
+    return failure("Applicant is already at this stage.");
+  }
+
+  if (parsed.data.status === "hired" && !current.convertedEmployeeId) {
+    return failure(
+      'To mark as hired, use "Convert to Employee" to create the employee record.'
+    );
+  }
+
+  const result = await updateApplicantStatus(parsed.data.applicantId, parsed.data.status);
+  if (!result.ok) return failure(result.error ?? "Failed to update stage.");
+  await safeAuditLog({
+    eventType: "recruitment.applicant_stage_changed",
+    action: "change_applicant_stage",
+    entityType: "recruitment_applicants",
+    entityId: parsed.data.applicantId,
+    campusId: scope.campusId,
+    metadata: {
+      fromStatus: current.status,
+      toStatus: parsed.data.status,
+      remarks: parsed.data.remarks ?? null,
+    },
+  });
+
+  revalidatePath(`/recruitment/applicants/${parsed.data.applicantId}`);
+  revalidatePath("/recruitment/applicants");
+  revalidatePath("/recruitment");
+  return success(parsed.data.applicantId);
+}
+
+// ── Convert applicant -> employee ────────────────────────────────────────────
+
+type ConvertResult =
+  | { ok: true; employeeId: string }
+  | { ok: false; error: string };
+
+export async function convertApplicantToEmployeeAction(
+  input: ConvertApplicantToEmployeeInput
+): Promise<ConvertResult> {
+  const parsed = convertApplicantToEmployeeSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid conversion input." };
+  }
+
+  const scope = await getApplicantScopeById(parsed.data.applicantId);
+  if (!scope) return { ok: false, error: "Applicant not found." };
+
+  const context = await requirePermission({
+    permission: "recruitment.applicants.write",
+    campusId: scope.campusId,
+    officeId: scope.officeId,
+  });
+
+  // Also require write on the destination employee scope.
+  await requirePermission({
+    permission: "employee.records.write",
+    campusId: parsed.data.campusId,
+    officeId: parsed.data.officeId ?? null,
+  });
+
+  if (parsed.data.officeId) {
+    const valid = await officeBelongsToCampus({
+      officeId: parsed.data.officeId,
+      campusId: parsed.data.campusId,
+    });
+    if (!valid) return { ok: false, error: "Selected office does not belong to selected campus." };
+  }
+
+  const applicant = await getApplicantById(parsed.data.applicantId);
+  if (!applicant) return { ok: false, error: "Applicant not found." };
+
+  if (applicant.convertedEmployeeId) {
+    return { ok: false, error: "This applicant has already been converted to an employee." };
+  }
+  if (applicant.status !== "shortlisted" && applicant.status !== "hired") {
+    return { ok: false, error: "Only shortlisted applicants can be converted to employees." };
+  }
+
+  if (applicant.email) {
+    const dup = await findActiveEmployeeByEmail(applicant.email);
+    if (dup) {
+      return {
+        ok: false,
+        error:
+          "An active employee with the same email already exists. Resolve the duplicate before converting.",
+      };
+    }
+  }
+
+  const employeeInput = {
+    employeeNo: parsed.data.employeeNo,
+    firstName: applicant.firstName,
+    middleName: applicant.middleName,
+    lastName: applicant.lastName,
+    suffix: applicant.suffix,
+    birthDate: null,
+    sex: null,
+    email: applicant.email,
+    mobileNo: applicant.mobileNo,
+    campusId: parsed.data.campusId,
+    officeId: parsed.data.officeId ?? null,
+    positionTitle: parsed.data.positionTitle ?? null,
+    plantillaItemNo: null,
+    employmentStatus: parsed.data.employmentStatus,
+    dateHired: parsed.data.dateHired,
+    civilStatus: null,
+    tin: null,
+    gsisNo: null,
+    philhealthNo: null,
+    pagibigNo: null,
+    employmentType: parsed.data.employmentType ?? null,
+    dateSeparated: null,
+    separationReason: null,
+    emergencyContactName: null,
+    emergencyContactPhone: null,
+    presentAddress: null,
+    permanentAddress: null,
+    cabinetNo: null,
+    externalRef: null,
+  };
+
+  const created = await createEmployee(employeeInput, context.appUserId);
+  if (!created.ok || !created.employeeId) {
+    return { ok: false, error: created.error ?? "Failed to create employee record." };
+  }
+
+  const linked = await linkApplicantToEmployeeAndMarkHired(
+    parsed.data.applicantId,
+    created.employeeId
+  );
+  if (!linked.ok) {
+    return {
+      ok: false,
+      error:
+        linked.error ??
+        "Employee was created but linking back to the applicant failed. Please contact your administrator.",
+    };
+  }
+
+  await safeAuditLog({
+    eventType: "recruitment.applicant_converted",
+    action: "convert_to_employee",
+    entityType: "recruitment_applicants",
+    entityId: parsed.data.applicantId,
+    campusId: parsed.data.campusId,
+    metadata: {
+      employeeId: created.employeeId,
+      employeeNo: parsed.data.employeeNo,
+      employmentStatus: parsed.data.employmentStatus,
+      dateHired: parsed.data.dateHired,
+    },
+  });
+
+  revalidatePath(`/recruitment/applicants/${parsed.data.applicantId}`);
+  revalidatePath("/recruitment/applicants");
+  revalidatePath("/recruitment");
+  revalidatePath("/employees");
+  revalidatePath(`/employees/${created.employeeId}`);
+
+  return { ok: true, employeeId: created.employeeId };
+}
+

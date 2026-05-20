@@ -12,6 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DataTableWrapper } from "@/components/foundation/data/data-table-wrapper";
 import { AdminDataTable, AdminStatusChip } from "@/components/foundation/data/admin-data-table";
 import { createAdminColumns, createRowActions } from "@/components/foundation/data/admin-data-table.helpers";
@@ -25,6 +32,7 @@ import {
 import type { CampusOption, OfficeListItem } from "@/features/admin/organization/types";
 import {
   officeFormSchema,
+  officeTypeValues,
   type OfficeTypeValue,
 } from "@/features/admin/organization/schemas/office-form.schema";
 
@@ -113,13 +121,13 @@ export function OfficeManagement({ offices, campuses, canMutate = true }: Office
 
   const rowActions = canMutate
     ? createRowActions<OfficeListItem>(
-        tableState.rows,
-        (row) => row.id,
-        (row) => [
-          { key: "edit", label: "Edit office" },
-          { key: "toggle-status", label: row.isActive ? "Deactivate" : "Activate", destructive: row.isActive },
-        ]
-      )
+      tableState.rows,
+      (row) => row.id,
+      (row) => [
+        { key: "edit", label: "Edit office" },
+        { key: "toggle-status", label: row.isActive ? "Deactivate" : "Activate", destructive: row.isActive },
+      ]
+    )
     : undefined;
 
   function openCreateDialog() {
@@ -246,20 +254,25 @@ export function OfficeManagement({ offices, campuses, canMutate = true }: Office
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Campus</label>
-              <select
-                className="h-9 w-full rounded-md border px-3 text-sm"
+              <Select
                 value={formState.campusId}
-                onChange={(event) => setFormState((prev) => ({ ...prev, campusId: event.target.value }))}
+                onValueChange={(v) => v !== null && setFormState((prev) => ({ ...prev, campusId: v }))}
               >
-                <option value="" disabled>
-                  Select campus
-                </option>
-                {campuses.map((campus) => (
-                  <option key={campus.id} value={campus.id}>
-                    {campus.code} - {campus.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {campuses.find((c) => c.id === formState.campusId)
+                      ? `${campuses.find((c) => c.id === formState.campusId)!.code} - ${campuses.find((c) => c.id === formState.campusId)!.name}`
+                      : "Select campus"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {campuses.map((campus) => (
+                    <SelectItem key={campus.id} value={campus.id}>
+                      {campus.code} — {campus.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Office Code</label>
@@ -270,20 +283,22 @@ export function OfficeManagement({ offices, campuses, canMutate = true }: Office
               <Input value={formState.name} onChange={(event) => setFormState((prev) => ({ ...prev, name: event.target.value }))} />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Office type</label>
-              <select
-                className="h-9 w-full rounded-md border px-3 text-sm"
+              <label className="text-sm font-medium">Office Type</label>
+              <Select
                 value={formState.officeType}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, officeType: event.target.value as OfficeTypeValue }))
-                }
+                onValueChange={(v) => v !== null && setFormState((prev) => ({ ...prev, officeType: v as OfficeTypeValue }))}
               >
-                {(Object.keys(OFFICE_TYPE_LABELS) as OfficeTypeValue[]).map((key) => (
-                  <option key={key} value={key}>
-                    {OFFICE_TYPE_LABELS[key]}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue>{OFFICE_TYPE_LABELS[formState.officeType]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {officeTypeValues.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {OFFICE_TYPE_LABELS[key]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Sort order</label>

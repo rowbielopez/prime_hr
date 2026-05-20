@@ -31,3 +31,27 @@ aaaaaa
 ## Deploy
 
 Hosted Supabase + Vercel: configure project env vars and Supabase Auth URL allow-list for your deployment origin (see prior deployment review). Local `config.toml` does not apply to hosted projects unless you push config via CLI.
+
+---
+
+## AI-Assisted Development Instructions
+
+This repository uses a structured AI instruction system. Before making any changes, read the appropriate file.
+
+| File / Folder | Purpose |
+|---|---|
+| `AGENTS.md` | **Start here.** Primary AI instruction file — project overview, architecture rules, coding standards, database rules, security rules |
+| `.github/copilot-instructions.md` | GitHub Copilot-specific instructions (auto-loaded by Copilot) |
+| `CLAUDE.md` | Claude Code / Claude agent instructions (references `AGENTS.md`) |
+| `docs/` | Architecture, database schema, PDS integration, UI standards, security, testing, roadmap |
+| `.agents/` | Specialized role reference files (architect, database, UI/UX, PDS, security, QA) |
+| `docs/copilot-prompt-library.md` | Ready-to-use prompts for common development workflows |
+
+### Quick Rules
+
+- **Always read `AGENTS.md` first** before writing any code.
+- **Never assume database column names** — inspect `supabase/migrations/` first.
+- **Never do destructive database changes** without explicit instruction and confirmation.
+- **Run `npm run verify`** (typecheck + lint + build) before marking any task complete.
+- **Do not change database or core logic** without reviewing the relevant `docs/` file first.
+

@@ -38,7 +38,7 @@ export const employeeFormSchema = z.object({
   email: z
     .preprocess(
       (v) => (v === "" || v === undefined ? null : v),
-      z.union([z.null(), z.string().email("Invalid email address")]).optional()
+      z.union([z.null(), z.string().email("Please enter a valid email address.")]).optional()
     )
     .optional(),
   mobileNo: z.string().trim().max(30, "Mobile number is too long").optional().nullable(),
@@ -63,6 +63,7 @@ export const employeeFormSchema = z.object({
   emergencyContactPhone: z.string().trim().max(40, "Phone is too long").optional().nullable(),
   presentAddress: optionalMultiline,
   permanentAddress: optionalMultiline,
+  cabinetNo: z.string().trim().max(50, "Cabinet No. is too long").optional().nullable(),
   externalRef: z.string().trim().max(120, "External reference is too long").optional().nullable(),
 });
 
@@ -97,6 +98,7 @@ export function getInitialEmployeeFormState(): EmployeeFormInput {
     emergencyContactPhone: null,
     presentAddress: null,
     permanentAddress: null,
+    cabinetNo: null,
     externalRef: null,
   };
 }

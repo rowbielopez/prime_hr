@@ -36,7 +36,7 @@ export function TopHeader({
 
   return (
     <header className="apple-toolbar sticky top-0 z-30 border-b premium-border">
-      <div className="flex h-16 items-center gap-3 px-4 lg:px-8">
+      <div className="flex h-14 items-center gap-2.5 px-4 lg:px-6">
         <Button
           type="button"
           variant="ghost"
@@ -58,7 +58,7 @@ export function TopHeader({
           <SidebarIcon className="size-4" />
         </Button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-semibold leading-5 text-foreground">
+          <p className="truncate text-sm font-semibold leading-5 text-foreground">
             {title ?? "CSU PRIME-HR"}
           </p>
           {subtitle ? (
@@ -70,13 +70,13 @@ export function TopHeader({
         <button
           type="button"
           onClick={onOpenCommand}
-          className="hidden h-10 min-w-[19rem] cursor-pointer items-center gap-2 rounded-xl border premium-border bg-surface-panel/80 px-3 text-sm text-muted-foreground shadow-premium-sm transition-all hover:bg-surface-raised hover:text-foreground hover:shadow-hover-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 lg:flex"
+          className="hidden h-8 min-w-[18rem] cursor-pointer items-center gap-2 rounded-md border premium-border bg-surface-panel px-2.5 text-sm text-muted-foreground shadow-premium-sm transition-all hover:bg-surface-raised hover:text-foreground hover:shadow-hover-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 lg:flex"
         >
           <Search className="size-4" />
           <span className="flex-1 text-left">
             Search modules, actions, people
           </span>
-          <kbd className="rounded-md border premium-border bg-surface-inset px-1.5 py-0.5 text-[11px] text-muted-foreground">
+          <kbd className="rounded border premium-border bg-surface-inset px-1.5 py-0.5 text-[11px] text-muted-foreground">
             Ctrl K
           </kbd>
         </button>
@@ -99,10 +99,10 @@ export function TopHeader({
         >
           <Bell className="size-4" />
         </Button>
-        <Separator orientation="vertical" className="hidden h-7 md:block" />
+        <Separator orientation="vertical" className="hidden h-6 md:block" />
         <UserMenu />
         {actions ? (
-          <Separator orientation="vertical" className="hidden h-7 md:block" />
+          <Separator orientation="vertical" className="hidden h-6 md:block" />
         ) : null}
         {actions ? (
           <div className="flex items-center gap-2">{actions}</div>

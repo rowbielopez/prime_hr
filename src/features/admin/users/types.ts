@@ -13,6 +13,17 @@ export type UserListItem = {
   isActive: boolean;
   status: "active" | "inactive" | "suspended";
   lastLoginAt: string | null;
+  employeeId: string | null;
+  employeeNo: string | null;
+  employeeName: string | null;
+};
+
+export type EmployeeSearchResult = {
+  id: string;
+  employeeNo: string;
+  fullName: string;
+  email: string | null;
+  campusName: string | null;
 };
 
 export type RoleOption = {

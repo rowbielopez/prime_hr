@@ -69,9 +69,9 @@ export function PageHeader({
   const inner = (
     <header className={cn("space-y-4", sticky ? undefined : className)}>
       {breadcrumb && breadcrumb.length > 0 ? <PageHeaderBreadcrumb items={breadcrumb} /> : null}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-1.5">
-          <h1 className="text-[1.7rem] font-semibold leading-tight text-foreground md:text-[2rem]">{title}</h1>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold leading-tight text-foreground md:text-[1.7rem]">{title}</h1>
           {resolvedSubtitle ? <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{resolvedSubtitle}</p> : null}
         </div>
         {actions || secondaryActions ? (

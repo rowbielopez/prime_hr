@@ -54,6 +54,7 @@ function SheetContent({
         data-side={side}
         className={cn(
           "fixed z-50 flex flex-col gap-0 border premium-border bg-popover/96 bg-clip-padding text-sm text-popover-foreground shadow-premium-lg ring-1 ring-foreground/10 transition duration-250 ease-[var(--motion-ease)] supports-backdrop-filter:bg-popover/90 supports-backdrop-filter:backdrop-blur-2xl motion-reduce:duration-0 data-ending-style:opacity-0 data-starting-style:opacity-0",
+          "[&>:not([data-slot=sheet-header]):not([data-slot=sheet-footer]):not([data-slot=sheet-close])]:px-5 sm:[&>:not([data-slot=sheet-header]):not([data-slot=sheet-footer]):not([data-slot=sheet-close])]:px-6",
           "data-[side=bottom]:inset-x-2 data-[side=bottom]:bottom-2 data-[side=bottom]:h-auto data-[side=bottom]:rounded-2xl data-[side=bottom]:data-ending-style:translate-y-[2.5rem] data-[side=bottom]:data-starting-style:translate-y-[2.5rem]",
           "data-[side=left]:inset-y-2 data-[side=left]:left-2 data-[side=left]:h-[calc(100%-1rem)] data-[side=left]:w-[calc(100%-1rem)] data-[side=left]:rounded-2xl data-[side=left]:data-ending-style:translate-x-[-2.5rem] data-[side=left]:data-starting-style:translate-x-[-2.5rem] data-[side=left]:sm:max-w-md data-[side=left]:lg:max-w-lg",
           "data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100%-1rem)] data-[side=right]:w-[calc(100%-1rem)] data-[side=right]:rounded-2xl data-[side=right]:data-ending-style:translate-x-[2.5rem] data-[side=right]:data-starting-style:translate-x-[2.5rem] data-[side=right]:sm:max-w-md data-[side=right]:lg:max-w-lg",
@@ -97,7 +98,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-footer"
-      className={cn("mt-auto flex flex-col gap-2 border-t premium-border bg-surface-inset/60 px-5 py-4 sm:flex-row sm:justify-end sm:px-6", className)}
+      className={cn("mt-4 flex flex-col gap-2 border-t premium-border bg-surface-inset/60 px-5 py-4 sm:flex-row sm:justify-end sm:px-6", className)}
       {...props}
     />
   )

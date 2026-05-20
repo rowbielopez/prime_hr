@@ -21,6 +21,15 @@
     "db:reset:linked": "supabase db reset --linked --yes",
     "db:migration:list": "supabase migration list",
     "db:gen-types": "supabase gen types typescript --local > src/lib/db/database.generated.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "legacy:analyze": "tsx scripts/migration/legacy-hris/analyze-sql.ts",
+    "legacy:mismatch": "tsx scripts/analyze-hris-employee-service-records.ts",
+    "legacy:dump": "tsx scripts/migration/legacy-hris/dump-to-ndjson.ts",
+    "legacy:load": "tsx scripts/migration/legacy-hris/load-staging.ts",
+    "legacy:validate": "tsx scripts/migration/legacy-hris/validate-staging.ts",
+    "legacy:migrate": "tsx scripts/migration/legacy-hris/migrate.ts",
+    "legacy:migrate:service-records": "tsx scripts/migration/legacy-hris/migrate-service-records.ts",
     "verify": "npm run typecheck && npm run lint && npm run build"
   },
   "dependencies": {
@@ -31,6 +40,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.7.0",
     "next": "16.2.2",
@@ -51,12 +61,15 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.6",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.2",
     "supabase": "^2.90.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vitest": "^4.1.6"
   }
 }

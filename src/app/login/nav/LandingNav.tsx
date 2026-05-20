@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import Image from "next/image";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useMotionPreference } from "@/app/login/hooks/use-motion-preference";
 
 export function LandingNav() {
     const [scrolled, setScrolled] = useState(false);
-    const reduceMotion = useReducedMotion();
+    const reduceMotion = useMotionPreference();
 
     useEffect(() => {
         const handler = () => setScrolled(window.scrollY > 24);
@@ -29,12 +31,14 @@ export function LandingNav() {
             <div className="container mx-auto px-6 lg:px-12 h-16 flex items-center justify-between gap-8">
                 {/* Logo */}
                 <div className="flex items-center gap-2.5 flex-shrink-0">
-                    <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-premium-sm">
-                        <svg viewBox="0 0 14 14" fill="none" className="w-4 h-4 text-primary-foreground">
-                            <path d="M7 2L11 5.5V9L7 12L3 9V5.5L7 2Z" fill="currentColor" opacity="0.9" />
-                            <path d="M7 4.5L9.5 6.5V8.5L7 10L4.5 8.5V6.5L7 4.5Z" fill="currentColor" opacity="0.4" />
-                        </svg>
-                    </div>
+                    <Image
+                        src="/600x600 CSU Logo.png"
+                        alt="Cagayan State University logo"
+                        width={28}
+                        height={28}
+                        className="object-contain"
+                        priority
+                    />
                     <div className="leading-none">
                         <div className="text-sm font-semibold text-foreground tracking-tight">CSU PRIME-HR</div>
                         <div className="text-[10px] text-muted-foreground hidden sm:block">Cagayan State University</div>

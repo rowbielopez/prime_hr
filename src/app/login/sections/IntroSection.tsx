@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { motion, useInView, useReducedMotion } from "framer-motion";
+import { startTransition, useEffect, useRef, useState } from "react";
+import { motion, useInView } from "framer-motion";
+import { useMotionPreference } from "@/app/login/hooks/use-motion-preference";
 import { scrollRevealVariants, scrollRevealTransition } from "@/components/foundation/motion/presets";
 
 interface CountUpProps {
@@ -12,12 +13,12 @@ interface CountUpProps {
 
 function CountUp({ target, suffix = "", isInView }: CountUpProps) {
     const [count, setCount] = useState(0);
-    const reduceMotion = useReducedMotion();
+    const reduceMotion = useMotionPreference();
 
     useEffect(() => {
         if (!isInView) return;
         if (reduceMotion) {
-            setCount(target);
+            startTransition(() => setCount(target));
             return;
         }
         let current = 0;
@@ -75,7 +76,7 @@ const stats = [
 export function IntroSection() {
     const ref = useRef<HTMLElement>(null);
     const isInView = useInView(ref, { once: true, margin: "-80px" });
-    const reduceMotion = useReducedMotion();
+    const reduceMotion = useMotionPreference();
 
     return (
         <section id="about" ref={ref} className="py-24 lg:py-32 bg-surface-canvas">

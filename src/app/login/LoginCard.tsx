@@ -35,6 +35,15 @@ export function LoginCard({ error, nextPath }: { error?: string; nextPath?: stri
     };
   }, []);
 
+  // When redirected back with an error, scroll straight to the sign-in section
+  useEffect(() => {
+    if (!error) return;
+    const el = document.getElementById("sign-in");
+    if (el) {
+      setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    }
+  }, [error]);
+
   async function signInWithGoogle() {
     setIsLoading(true);
     try {

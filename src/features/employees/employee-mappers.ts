@@ -30,6 +30,7 @@ export function employeeDetailToFormInput(employee: EmployeeDetail): EmployeeFor
     emergencyContactPhone: employee.emergencyContactPhone,
     presentAddress: employee.presentAddress,
     permanentAddress: employee.permanentAddress,
+    cabinetNo: employee.cabinetNo,
     externalRef: employee.externalRef,
   };
 }
