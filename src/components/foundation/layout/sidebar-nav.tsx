@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -72,6 +72,18 @@ export function SidebarNav({
 
     const activeGroupTitle =
         allItems.find((item) => item.href === activeHref)?.group ?? null;
+
+    // Track previous active group so navigating into a new group auto-opens it
+    // without preventing manual collapse while already inside that group.
+    const prevActiveGroupRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (activeGroupTitle && activeGroupTitle !== prevActiveGroupRef.current) {
+            prevActiveGroupRef.current = activeGroupTitle;
+            setOpenGroups((prev) =>
+                prev.includes(activeGroupTitle) ? prev : [...prev, activeGroupTitle],
+            );
+        }
+    }, [activeGroupTitle, setOpenGroups]);
 
     function togglePin(href: string) {
         setPins((prev) =>
@@ -241,9 +253,8 @@ export function SidebarNav({
             ) : null}
 
             {groups.map((group) => {
-                const hasActiveItem = group.title === activeGroupTitle;
                 const isOpen =
-                    collapsed || hasActiveItem || openGroups.includes(group.title);
+                    collapsed || openGroups.includes(group.title);
 
                 return (
                     <section key={group.title} className="space-y-1">

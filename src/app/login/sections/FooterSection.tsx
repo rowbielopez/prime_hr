@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function FooterSection() {
     const year = new Date().getFullYear();
 
@@ -94,6 +96,14 @@ export function FooterSection() {
                                 Campus HR Officer or MIS Office
                             </div>
                         </div>
+                        {/* Careers link */}
+                        <Link
+                            href="/careers"
+                            className="mt-4 inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-border bg-surface-raised text-sm text-foreground hover:bg-surface-hover transition-colors duration-150"
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                            View open positions
+                        </Link>
                     </div>
                 </div>
 

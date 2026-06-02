@@ -26,6 +26,27 @@ type OfficesRow = {
   deleted_at: string | null;
 };
 
+type EmployeeRequestType =
+  | "profile_correction"
+  | "employment_detail_correction"
+  | "pds_update"
+  | "service_record_correction"
+  | "document_request"
+  | "certificate_request"
+  | "leave_related_request"
+  | "account_login_concern"
+  | "other_hr_request";
+
+type EmployeeRequestStatus =
+  | "draft"
+  | "submitted"
+  | "under_review"
+  | "returned_for_revision"
+  | "approved"
+  | "rejected"
+  | "completed"
+  | "cancelled";
+
 export type Database = {
   public: {
     Tables: {
@@ -138,6 +159,65 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["employee_documents"]["Row"]>;
       };
+      employee_requests: {
+        Row: {
+          id: string;
+          employee_id: string;
+          campus_id: string;
+          office_id: string | null;
+          request_type: EmployeeRequestType;
+          subject: string;
+          description: string;
+          field_to_correct: string | null;
+          current_value: string | null;
+          requested_value: string | null;
+          related_module: string | null;
+          related_record_id: string | null;
+          status: EmployeeRequestStatus;
+          hr_remarks: string | null;
+          submitted_at: string | null;
+          reviewed_at: string | null;
+          reviewed_by_user_id: string | null;
+          completed_at: string | null;
+          internal_notes: string | null;
+          cancelled_at: string | null;
+          created_by_user_id: string | null;
+          updated_by_user_id: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: Partial<Database["public"]["Tables"]["employee_requests"]["Row"]> & {
+          employee_id: string;
+          campus_id: string;
+          request_type: EmployeeRequestType;
+          subject: string;
+          description: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["employee_requests"]["Row"]>;
+      };
+      employee_request_status_history: {
+        Row: {
+          id: string;
+          request_id: string;
+          employee_id: string;
+          campus_id: string;
+          office_id: string | null;
+          from_status: EmployeeRequestStatus | null;
+          to_status: EmployeeRequestStatus;
+          remarks: string | null;
+          internal_notes: string | null;
+          actor_user_id: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["employee_request_status_history"]["Row"]> & {
+          request_id: string;
+          employee_id: string;
+          campus_id: string;
+          to_status: EmployeeRequestStatus;
+        };
+        Update: Partial<Database["public"]["Tables"]["employee_request_status_history"]["Row"]>;
+      };
       recruitment_vacancies: {
         Row: {
           id: string;
@@ -153,6 +233,7 @@ export type Database = {
           posted_at: string | null;
           closing_at: string | null;
           remarks: string | null;
+          public_slug: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -173,6 +254,7 @@ export type Database = {
           office_id: string | null;
           status: "new" | "screening" | "shortlisted" | "hired" | "rejected" | "withdrawn";
           notes: string | null;
+          source: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -190,6 +272,7 @@ export type Database = {
           status: "submitted" | "screening" | "interview" | "for_offer" | "hired" | "rejected" | "withdrawn";
           applied_at: string | null;
           remarks: string | null;
+          reference_no: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -339,7 +422,24 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["audit_logs"]["Row"]>;
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      public_vacancies: {
+        Row: {
+          public_slug: string;
+          title: string;
+          description: string | null;
+          qualification_notes: string | null;
+          plantilla_item_no: string | null;
+          employment_type: string | null;
+          item_count: number;
+          posted_at: string | null;
+          closing_at: string | null;
+          updated_at: string;
+          campus_name: string;
+          office_name: string | null;
+        };
+      };
+    };
     Functions: {
       apply_compliance_evidence_status_change: {
         Args: {
@@ -363,7 +463,10 @@ export type Database = {
         Returns: null;
       };
     };
-    Enums: Record<string, never>;
+    Enums: {
+      employee_request_type: EmployeeRequestType;
+      employee_request_status: EmployeeRequestStatus;
+    };
     CompositeTypes: Record<string, never>;
   };
 };

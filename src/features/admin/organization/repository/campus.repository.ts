@@ -1,6 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { AuthorizationContext } from "@/features/auth/types";
 import type { CampusFormInput } from "@/features/admin/organization/schemas/campus-form.schema";
-import type { CampusListItem, CampusOption } from "@/features/admin/organization/types";
+import type {
+  CampusListItem,
+  CampusOption,
+} from "@/features/admin/organization/types";
 
 export type CampusSnapshot = {
   code: string;
@@ -10,7 +14,9 @@ export type CampusSnapshot = {
   isActive: boolean;
 };
 
-export type CreateCampusResult = { ok: true; campusId: string } | { ok: false; error: string };
+export type CreateCampusResult =
+  | { ok: true; campusId: string }
+  | { ok: false; error: string };
 
 export type SimpleMutationResult = { ok: true } | { ok: false; error: string };
 
@@ -48,7 +54,17 @@ function typedQuery<T>(value: unknown): QueryResult<T> {
   return value as QueryResult<T>;
 }
 
-export async function getCampusSnapshot(campusId: string): Promise<CampusSnapshot | null> {
+function isGlobalOrganizationAdmin(context?: AuthorizationContext): boolean {
+  return (
+    !context ||
+    context.isSuperAdmin ||
+    context.roles.includes("central_hr_admin")
+  );
+}
+
+export async function getCampusSnapshot(
+  campusId: string,
+): Promise<CampusSnapshot | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = typedQuery<CampusSnapshotRow>(
     await supabase
@@ -96,14 +112,20 @@ export async function listCampuses(): Promise<CampusListItem[]> {
   }));
 }
 
-export async function listCampusOptions(): Promise<CampusOption[]> {
+export async function listCampusOptions(
+  context?: AuthorizationContext,
+): Promise<CampusOption[]> {
   const supabase = await createSupabaseServerClient();
+  let query = supabase
+    .from("campuses")
+    .select("id, name, code, short_name, sort_order")
+    .is("deleted_at", null)
+    .eq("is_active", true);
+  if (!isGlobalOrganizationAdmin(context) && context?.campusScopes.length) {
+    query = query.in("id", context.campusScopes);
+  }
   const { data, error } = typedQuery<CampusOptionSelectRow[]>(
-    await supabase
-      .from("campuses")
-      .select("id, name, code, short_name, sort_order")
-      .is("deleted_at", null)
-      .eq("is_active", true)
+    await query
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
   );
@@ -121,7 +143,9 @@ export async function listCampusOptions(): Promise<CampusOption[]> {
   }));
 }
 
-export async function createCampus(input: CampusFormInput): Promise<CreateCampusResult> {
+export async function createCampus(
+  input: CampusFormInput,
+): Promise<CreateCampusResult> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = typedQuery<CampusIdRow>(
     await supabase
@@ -144,7 +168,10 @@ export async function createCampus(input: CampusFormInput): Promise<CreateCampus
   return { ok: true, campusId: data.id };
 }
 
-export async function updateCampus(campusId: string, input: CampusFormInput): Promise<SimpleMutationResult> {
+export async function updateCampus(
+  campusId: string,
+  input: CampusFormInput,
+): Promise<SimpleMutationResult> {
   const supabase = await createSupabaseServerClient();
   const { error } = typedQuery<null>(
     await supabase
@@ -166,10 +193,16 @@ export async function updateCampus(campusId: string, input: CampusFormInput): Pr
   return { ok: true };
 }
 
-export async function setCampusActive(campusId: string, isActive: boolean): Promise<SimpleMutationResult> {
+export async function setCampusActive(
+  campusId: string,
+  isActive: boolean,
+): Promise<SimpleMutationResult> {
   const supabase = await createSupabaseServerClient();
   const { error } = typedQuery<null>(
-    await supabase.from("campuses").update({ is_active: isActive } as never).eq("id", campusId),
+    await supabase
+      .from("campuses")
+      .update({ is_active: isActive } as never)
+      .eq("id", campusId),
   );
 
   if (error) {

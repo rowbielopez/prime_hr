@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -6,6 +6,10 @@ import { requirePermission } from "@/features/auth/server/require-permission";
 import { writeAuditLog } from "@/features/audit/server/write-audit-log";
 
 export type PdsReviewActionResult = { ok: true } | { ok: false; error: string };
+
+function pdsReviewFailure(): PdsReviewActionResult {
+    return { ok: false, error: "We could not update this PDS review right now. Please try again." };
+}
 
 export async function approvePdsAction(profileId: string, employeeId: string): Promise<PdsReviewActionResult> {
     const context = await requirePermission({ permission: "pds.review.write" });
@@ -24,7 +28,7 @@ export async function approvePdsAction(profileId: string, employeeId: string): P
         .eq("id", profileId)
         .in("status", ["ready_for_review", "under_hr_review"]);
 
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsReviewFailure();
 
     await writeAuditLog({ eventType: "pds", action: "approve", entityType: "pds_profile", entityId: employeeId });
     revalidatePath("/pds/review");
@@ -50,10 +54,11 @@ export async function rejectPdsAction(profileId: string, employeeId: string, rea
         .eq("id", profileId)
         .in("status", ["ready_for_review", "under_hr_review"]);
 
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsReviewFailure();
 
     await writeAuditLog({ eventType: "pds", action: "reject", entityType: "pds_profile", entityId: employeeId, metadata: { reason } });
     revalidatePath("/pds/review");
     revalidatePath(`/employees/${employeeId}/pds`);
     return { ok: true };
 }
+

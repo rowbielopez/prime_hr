@@ -1,4 +1,5 @@
 import { writeAuditLog } from "@/features/audit/server/write-audit-log";
+import { logServerError } from "@/lib/logging/server-logger";
 import type { AuditEventType } from "@/features/platform/audit/audit-events";
 
 export async function logPlatformAudit(input: {
@@ -19,7 +20,7 @@ export async function logPlatformAudit(input: {
       metadata: input.metadata,
     });
   } catch (error) {
-    console.error("platform_audit_log_failed", error);
+    logServerError("platform_audit_log_failed", error);
   }
 }
 

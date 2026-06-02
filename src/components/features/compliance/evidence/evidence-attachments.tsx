@@ -11,13 +11,25 @@ import type { EvidenceAttachmentItem } from "@/features/compliance/evidence/type
 type EvidenceAttachmentsProps = {
   evidenceId: string;
   attachments: EvidenceAttachmentItem[];
-  onAddAttachment: (input: { evidenceId: string; fileName: string; fileType: string; storagePath?: string | null }) => Promise<{
+  onAddAttachment: (input: {
+    evidenceId: string;
+    fileName: string;
+    fileType: string;
+    storagePath?: string | null;
+  }) => Promise<{
     ok: boolean;
     error?: string;
   }>;
-  onUploadAttachment: (formData: FormData) => Promise<{ ok: boolean; error?: string }>;
-  onGetSignedUrl: (attachmentId: string) => Promise<{ ok: boolean; url?: string; error?: string }>;
-  onDeleteAttachment: (input: { attachmentId: string; deleteFromStorage: boolean }) => Promise<{
+  onUploadAttachment: (
+    formData: FormData,
+  ) => Promise<{ ok: boolean; error?: string }>;
+  onGetSignedUrl: (
+    attachmentId: string,
+  ) => Promise<{ ok: boolean; url?: string; error?: string }>;
+  onDeleteAttachment: (input: {
+    attachmentId: string;
+    deleteFromStorage: boolean;
+  }) => Promise<{
     ok: boolean;
     error?: string;
   }>;
@@ -32,7 +44,11 @@ export function EvidenceAttachments({
   onDeleteAttachment,
 }: EvidenceAttachmentsProps) {
   const [isPending, startTransition] = useTransition();
-  const [formState, setFormState] = useState({ fileName: "", fileType: "", storagePath: "" });
+  const [formState, setFormState] = useState({
+    fileName: "",
+    fileType: "",
+    storagePath: "",
+  });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -44,7 +60,9 @@ export function EvidenceAttachments({
       storagePath: formState.storagePath || null,
     });
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Invalid attachment metadata.");
+      toast.error(
+        parsed.error.issues[0]?.message ?? "Invalid attachment metadata.",
+      );
       return;
     }
     startTransition(async () => {
@@ -91,16 +109,16 @@ export function EvidenceAttachments({
   }
 
   function deleteAttachment(attachmentId: string) {
-    const deleteFromStorage = window.confirm(
-      "Delete this attachment from secure storage too?\n\nPress OK to delete from storage and hide from record.\nPress Cancel to keep file in storage and only hide from this record."
-    );
     startTransition(async () => {
-      const result = await onDeleteAttachment({ attachmentId, deleteFromStorage });
+      const result = await onDeleteAttachment({
+        attachmentId,
+        deleteFromStorage: true,
+      });
       if (!result.ok) {
         toast.error(result.error ?? "Failed to delete attachment.");
         return;
       }
-      toast.success(deleteFromStorage ? "Attachment deleted from storage and record." : "Attachment hidden from record.");
+      toast.success("Attachment deleted from storage and record.");
     });
   }
 
@@ -108,13 +126,15 @@ export function EvidenceAttachments({
     <section className="rounded-lg border p-4">
       <h3 className="text-sm font-semibold">Evidence Attachments</h3>
       <p className="mt-1 text-sm text-muted-foreground">
-        Record attachment metadata after files are stored in your approved repository (shared drive, DMS, or future
-        direct upload). Filename and type are stored here for audit traceability.
+        Record attachment metadata after files are stored in your approved
+        repository (shared drive, DMS, or future direct upload). Filename and
+        type are stored here for audit traceability.
       </p>
 
       <div className="mt-4 rounded-md border border-dashed bg-muted/30 p-3 text-sm text-muted-foreground">
-        Upload files directly to secure storage using the upload form below, or keep encoding external references
-        through metadata if your evidence source lives in another approved repository.
+        Upload files directly to secure storage using the upload form below, or
+        keep encoding external references through metadata if your evidence
+        source lives in another approved repository.
       </div>
 
       <div className="mt-4 rounded-md border p-3">
@@ -123,9 +143,15 @@ export function EvidenceAttachments({
           <Input
             ref={fileInputRef}
             type="file"
-            onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+            onChange={(event) =>
+              setSelectedFile(event.target.files?.[0] ?? null)
+            }
           />
-          <Button size="sm" onClick={uploadFile} disabled={isPending || !selectedFile}>
+          <Button
+            size="sm"
+            onClick={uploadFile}
+            disabled={isPending || !selectedFile}
+          >
             Upload & Attach
           </Button>
         </div>
@@ -135,17 +161,23 @@ export function EvidenceAttachments({
         <Input
           placeholder="Filename"
           value={formState.fileName}
-          onChange={(e) => setFormState((p) => ({ ...p, fileName: e.target.value }))}
+          onChange={(e) =>
+            setFormState((p) => ({ ...p, fileName: e.target.value }))
+          }
         />
         <Input
           placeholder="File type (PDF/Image/Sheet)"
           value={formState.fileType}
-          onChange={(e) => setFormState((p) => ({ ...p, fileType: e.target.value }))}
+          onChange={(e) =>
+            setFormState((p) => ({ ...p, fileType: e.target.value }))
+          }
         />
         <Input
           placeholder="Storage path (optional)"
           value={formState.storagePath}
-          onChange={(e) => setFormState((p) => ({ ...p, storagePath: e.target.value }))}
+          onChange={(e) =>
+            setFormState((p) => ({ ...p, storagePath: e.target.value }))
+          }
         />
       </div>
       <div className="mt-3 flex justify-end">
@@ -178,7 +210,9 @@ export function EvidenceAttachments({
                   <td className="px-2 py-2">{item.fileName}</td>
                   <td className="px-2 py-2">{item.fileType}</td>
                   <td className="px-2 py-2">{item.uploadedAt.slice(0, 10)}</td>
-                  <td className="px-2 py-2">{item.uploadedByLabel ?? "Unknown"}</td>
+                  <td className="px-2 py-2">
+                    {item.uploadedByLabel ?? "Unknown"}
+                  </td>
                   <td className="px-2 py-2 text-right">
                     <div className="flex justify-end gap-2">
                       {item.storagePath ? (
@@ -191,11 +225,17 @@ export function EvidenceAttachments({
                           Open
                         </Button>
                       ) : (
-                        <span className="text-xs text-muted-foreground">No stored file</span>
+                        <span className="text-xs text-muted-foreground">
+                          No stored file
+                        </span>
                       )}
                       <ConfirmDialog
                         trigger={
-                          <Button size="sm" variant="destructive" disabled={isPending}>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={isPending}
+                          >
                             Remove
                           </Button>
                         }

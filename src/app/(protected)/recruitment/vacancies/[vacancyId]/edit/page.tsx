@@ -41,10 +41,11 @@ export default async function EditVacancyPage({ params }: { params: Promise<{ va
           postedAt: detail.postedAt,
           closingAt: detail.closingAt,
           remarks: detail.remarks,
+          requiredDocuments: detail.requiredDocuments,
         }}
         campusOptions={campuses}
         officeOptions={offices}
-        onSubmit={(input) => updateVacancyAction(vacancyId, input)}
+        onSubmit={updateVacancyAction.bind(null, vacancyId)}
       />
     </div>
   );

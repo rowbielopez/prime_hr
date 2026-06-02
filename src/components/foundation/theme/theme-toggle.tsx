@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { Laptop, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/foundation/theme/theme-provider";
 import { Button } from "@/components/ui/button";
 
 const themeCycle = ["light", "dark", "system"] as const;

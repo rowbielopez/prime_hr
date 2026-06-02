@@ -16,7 +16,8 @@ export type AppNavIconKey =
   | "heart-handshake"
   | "settings"
   | "calendar-days"
-  | "file-text";
+  | "file-text"
+  | "inbox";
 
 /** Module accent buckets — mirror `--module-*` token names in `globals.css`. */
 export type AppModuleColor =
@@ -57,11 +58,18 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     navLabel: "Dashboard",
     navDescription: "Overview and operational snapshot",
     icon: "layout-dashboard",
-    requiredRoles: ["super_admin", "central_hr_admin", "campus_hr_officer", "office_unit_head", "committee_member"],
+    requiredRoles: [
+      "super_admin",
+      "central_hr_admin",
+      "campus_hr_officer",
+      "office_unit_head",
+      "committee_member",
+    ],
     requiredPermissions: ["dashboard.read"],
     pageLabel: "Dashboard",
     pageTitle: "Dashboard",
-    pageSubtitle: "Operational snapshot across HR workflows and PRIME-HR governance.",
+    pageSubtitle:
+      "Operational snapshot across HR workflows and PRIME-HR governance.",
   },
   {
     path: "/me",
@@ -72,7 +80,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["dashboard.read"],
     pageLabel: "My Workspace",
     pageTitle: "My Workspace",
-    pageSubtitle: "Your personal HR home — profile, PDS, documents, and account.",
+    pageSubtitle:
+      "Your personal HR home — profile, PDS, documents, and account.",
     moduleColor: "people",
   },
   {
@@ -84,7 +93,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["dashboard.read"],
     pageLabel: "My Profile",
     pageTitle: "My Profile",
-    pageSubtitle: "Your basic information, contact details, and government IDs.",
+    pageSubtitle:
+      "Your basic information, contact details, and government IDs.",
     moduleColor: "people",
   },
   {
@@ -108,7 +118,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["dashboard.read"],
     pageLabel: "My Service Record",
     pageTitle: "My Service Record",
-    pageSubtitle: "View your official HR-managed service history and current assignment.",
+    pageSubtitle:
+      "View your official HR-managed service history and current assignment.",
     moduleColor: "people",
   },
   {
@@ -120,7 +131,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["dashboard.read"],
     pageLabel: "My Documents",
     pageTitle: "My Documents",
-    pageSubtitle: "Documents in your 201 file. Contact HR for copies or new uploads.",
+    pageSubtitle:
+      "Documents in your 201 file. Contact HR for copies or new uploads.",
     moduleColor: "people",
   },
   {
@@ -145,7 +157,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["dashboard.read"],
     pageLabel: "My Leave",
     pageTitle: "My Leave",
-    pageSubtitle: "View your leave balances, filed leaves, and approval status.",
+    pageSubtitle:
+      "View your leave balances, filed leaves, and approval status.",
     moduleColor: "people",
   },
   {
@@ -154,7 +167,6 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     navLabel: "My Requests",
     navDescription: "Correction requests and statuses",
     icon: "file-search",
-    isComingSoon: true,
     requiredPermissions: ["dashboard.read"],
     pageLabel: "My Requests",
     pageTitle: "My Requests",
@@ -197,6 +209,19 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     pageSubtitle: "Master employee information and profile history.",
   },
   {
+    path: "/requests/review",
+    navGroup: "Core HR",
+    navLabel: "Employee Requests",
+    navDescription: "Review and process employee-submitted HR requests",
+    icon: "inbox",
+    requiredPermissions: ["employee.requests.review.read"],
+    pageLabel: "Employee Requests",
+    pageTitle: "Employee Requests",
+    pageSubtitle:
+      "Review, respond to, and manage employee-submitted HR requests.",
+    moduleColor: "people",
+  },
+  {
     path: "/service-records",
     navGroup: "Core HR",
     navLabel: "Service Records",
@@ -205,7 +230,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["employee.records.read"],
     pageLabel: "Service Records",
     pageTitle: "Service Records",
-    pageSubtitle: "Official HR-managed service history, appointment movements, and printable records.",
+    pageSubtitle:
+      "Official HR-managed service history, appointment movements, and printable records.",
     moduleColor: "people",
   },
   {
@@ -217,7 +243,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["pds.self.read"],
     pageLabel: "Personal Data Sheet",
     pageTitle: "Personal Data Sheet",
-    pageSubtitle: "Encode, validate, review, and generate CSC PDS 2025 records.",
+    pageSubtitle:
+      "Encode, validate, review, and generate CSC PDS 2025 records.",
     moduleColor: "people",
   },
   {
@@ -229,7 +256,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["pds.review.read"],
     pageLabel: "PDS Review Queue",
     pageTitle: "PDS Review Queue",
-    pageSubtitle: "Review submitted PDS drafts, verify records, and manage corrections.",
+    pageSubtitle:
+      "Review submitted PDS drafts, verify records, and manage corrections.",
     moduleColor: "people",
   },
   {
@@ -241,7 +269,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["recruitment.vacancies.read"],
     pageLabel: "Recruitment",
     pageTitle: "Recruitment",
-    pageSubtitle: "Vacancy planning, requisition tracking, and hiring pipeline foundations.",
+    pageSubtitle:
+      "Vacancy planning, requisition tracking, and hiring pipeline foundations.",
   },
   {
     path: "/recruitment/vacancies",
@@ -252,7 +281,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["recruitment.vacancies.read"],
     pageLabel: "Vacancy Management",
     pageTitle: "Vacancy Management",
-    pageSubtitle: "Manage vacancies by campus and office with workflow status tracking.",
+    pageSubtitle:
+      "Manage vacancies by campus and office with workflow status tracking.",
   },
   {
     path: "/recruitment/applicants",
@@ -263,7 +293,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["recruitment.applicants.read"],
     pageLabel: "Applicant Tracking",
     pageTitle: "Applicant Tracking",
-    pageSubtitle: "Track applicant pipeline and linked vacancy applications.",
+    pageSubtitle:
+      "Track applicants, linked vacancies, positions, and recruitment progress in one place.",
   },
   {
     path: "/recruitment/ranking",
@@ -274,7 +305,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["recruitment.recommendations.read"],
     pageLabel: "Ranking Summary",
     pageTitle: "Ranking Summary",
-    pageSubtitle: "View ranking list, remarks, and recommendation status by vacancy.",
+    pageSubtitle:
+      "View ranking list, remarks, and recommendation status by vacancy.",
   },
   {
     path: "/recruitment/recommendations",
@@ -296,7 +328,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["recruitment.recommendations.read"],
     pageLabel: "Recommendation Reports",
     pageTitle: "Recommendation Reports",
-    pageSubtitle: "Recommendation counts, status mix, and vacancy-level breakdown.",
+    pageSubtitle:
+      "Recommendation counts, status mix, and vacancy-level breakdown.",
   },
   {
     path: "/performance",
@@ -307,7 +340,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["performance.read"],
     pageLabel: "Performance",
     pageTitle: "Performance Management",
-    pageSubtitle: "Cycle setup, target tracking, reviews, final ratings, and completion dashboards.",
+    pageSubtitle:
+      "Cycle setup, target tracking, reviews, final ratings, and completion dashboards.",
   },
   {
     path: "/performance/cycles",
@@ -329,7 +363,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["performance.read"],
     pageLabel: "Performance Records",
     pageTitle: "Performance Records",
-    pageSubtitle: "Create and manage performance records, objectives, and remarks.",
+    pageSubtitle:
+      "Create and manage performance records, objectives, and remarks.",
   },
   {
     path: "/performance/reviews",
@@ -340,13 +375,15 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["performance.review"],
     pageLabel: "Performance Reviews",
     pageTitle: "Performance Reviews",
-    pageSubtitle: "Review submitted records and send back revisions or approvals.",
+    pageSubtitle:
+      "Review submitted records and send back revisions or approvals.",
   },
   {
     path: "/performance/my",
     pageLabel: "My Performance",
     pageTitle: "My Performance Records",
-    pageSubtitle: "Enter targets, update accomplishments, and submit for review.",
+    pageSubtitle:
+      "Enter targets, update accomplishments, and submit for review.",
   },
   {
     path: "/performance/dashboard",
@@ -357,7 +394,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["performance.dashboard.read"],
     pageLabel: "Performance Dashboard",
     pageTitle: "Performance Completion Dashboard",
-    pageSubtitle: "Track cycle participation, review progress, and finalization rates.",
+    pageSubtitle:
+      "Track cycle participation, review progress, and finalization rates.",
   },
   {
     path: "/performance/finalizations",
@@ -368,7 +406,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["performance.finalize"],
     pageLabel: "Performance Finalization",
     pageTitle: "Performance Finalization",
-    pageSubtitle: "Compute final scores, map rating bands, and finalize records.",
+    pageSubtitle:
+      "Compute final scores, map rating bands, and finalize records.",
   },
   {
     path: "/performance/summary",
@@ -390,7 +429,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["performance.finalize"],
     pageLabel: "Performance Rating Bands",
     pageTitle: "Performance Rating Band Configuration",
-    pageSubtitle: "Maintain score thresholds used for final performance rating bands.",
+    pageSubtitle:
+      "Maintain score thresholds used for final performance rating bands.",
   },
   {
     path: "/rewards",
@@ -401,7 +441,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["rewards.read"],
     pageLabel: "Rewards",
     pageTitle: "Rewards & Recognition",
-    pageSubtitle: "Manage awards catalog, nominations, reviews, and awardee history.",
+    pageSubtitle:
+      "Manage awards catalog, nominations, reviews, and awardee history.",
   },
   {
     path: "/rewards/awards",
@@ -434,7 +475,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["rewards.nomination.review"],
     pageLabel: "Nomination Reviews",
     pageTitle: "Nomination Reviews",
-    pageSubtitle: "Review nominations, apply remarks/scoring, and recommend outcomes.",
+    pageSubtitle:
+      "Review nominations, apply remarks/scoring, and recommend outcomes.",
   },
   {
     path: "/rewards/approvals",
@@ -467,7 +509,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["rewards.reports.read"],
     pageLabel: "Rewards Reports",
     pageTitle: "Rewards & Recognition Reports",
-    pageSubtitle: "Review approval turnaround and awardee distribution with period filters.",
+    pageSubtitle:
+      "Review approval turnaround and awardee distribution with period filters.",
   },
   {
     path: "/learning",
@@ -478,7 +521,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["learning.access"],
     pageLabel: "Learning",
     pageTitle: "Learning & Development",
-    pageSubtitle: "Training management, annual plans, attendance, and employee learning history.",
+    pageSubtitle:
+      "Training management, annual plans, attendance, and employee learning history.",
   },
   {
     path: "/learning/programs",
@@ -511,7 +555,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["learning.read"],
     pageLabel: "Training Sessions",
     pageTitle: "Training Sessions",
-    pageSubtitle: "Schedule sessions, assign participants, and track attendance.",
+    pageSubtitle:
+      "Schedule sessions, assign participants, and track attendance.",
   },
   {
     path: "/learning/requests",
@@ -606,7 +651,12 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     navDescription: "Benefits enrollment and leave workflows",
     icon: "heart-handshake",
     isComingSoon: true,
-    requiredRoles: ["super_admin", "central_hr_admin", "campus_hr_officer", "employee"],
+    requiredRoles: [
+      "super_admin",
+      "central_hr_admin",
+      "campus_hr_officer",
+      "employee",
+    ],
     pageLabel: "Benefits",
     pageTitle: "Benefits & Leave",
   },
@@ -636,7 +686,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["compliance.dashboard.read"],
     pageLabel: "Compliance Dashboard",
     pageTitle: "Compliance Dashboard",
-    pageSubtitle: "Summary of compliance performance, gaps, and overdue actions.",
+    pageSubtitle:
+      "Summary of compliance performance, gaps, and overdue actions.",
   },
   {
     path: "/audit",
@@ -650,8 +701,7 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     navLabel: "Audit Logs",
     navDescription: "Security and activity monitoring",
     icon: "file-search",
-    isComingSoon: true,
-    requiredPermissions: ["audit.logs.read"],
+    requiredPermissions: ["audit.logs.read", "audit.logs.campus.read"],
     pageLabel: "Audit Logs",
     pageTitle: "Audit Logs",
     pageSubtitle: "Review security-sensitive and operational events.",
@@ -662,8 +712,7 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     navLabel: "Reports & Analytics",
     navDescription: "Operational and executive reporting",
     icon: "bar-chart-3",
-    isComingSoon: true,
-    requiredRoles: ["super_admin", "central_hr_admin", "campus_hr_officer"],
+    requiredPermissions: ["reports.read"],
     pageLabel: "Reports",
     pageTitle: "Reports & Analytics",
     pageSubtitle: "Operational and executive reporting dashboards.",
@@ -691,7 +740,10 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     navLabel: "Office Management",
     navDescription: "Office records and campus assignment",
     icon: "building-2",
-    requiredPermissions: ["admin.organization.read"],
+    requiredPermissions: [
+      "admin.organization.read",
+      "admin.campus.organization.read",
+    ],
     pageLabel: "Office Management",
     pageTitle: "Office Management",
     pageSubtitle: "Create, update, and assign offices by campus.",
@@ -702,7 +754,7 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     navLabel: "User Administration",
     navDescription: "Role, scope, and account management",
     icon: "users",
-    requiredPermissions: ["admin.users.read"],
+    requiredPermissions: ["admin.users.read", "admin.campus.users.read"],
     pageLabel: "User Administration",
     pageTitle: "User Administration",
     pageSubtitle: "Manage users, roles, and access scope.",
@@ -716,7 +768,8 @@ export const APP_ROUTE_DEFINITIONS: AppRouteDefinition[] = [
     requiredPermissions: ["compliance.indicators.write"],
     pageLabel: "Compliance Indicators",
     pageTitle: "Compliance Indicators",
-    pageSubtitle: "Create and maintain compliance indicators used by evidence workflows.",
+    pageSubtitle:
+      "Create and maintain compliance indicators used by evidence workflows.",
   },
   {
     path: "/settings",
@@ -742,5 +795,6 @@ export function normalizeRoutePath(pathname: string) {
   return withLeadingSlash;
 }
 
-export const APP_ROUTE_BY_PATH = new Map(APP_ROUTE_DEFINITIONS.map((route) => [route.path, route]));
-
+export const APP_ROUTE_BY_PATH = new Map(
+  APP_ROUTE_DEFINITIONS.map((route) => [route.path, route]),
+);

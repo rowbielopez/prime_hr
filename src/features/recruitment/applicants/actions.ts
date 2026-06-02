@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/features/audit/server/write-audit-log";
+import { logServerError } from "@/lib/logging/server-logger";
 import { requirePermission } from "@/features/auth/server/require-permission";
 import { officeBelongsToCampus } from "@/features/admin/organization/repository/scope.repository";
 import { getVacancyScopeById } from "@/features/recruitment/vacancies/repository/vacancies.repository";
@@ -53,11 +54,23 @@ function failure(error: string): ActionResult {
   return { ok: false, error };
 }
 
+function toFriendlyApplicationCreateError(error?: string) {
+  if (!error) return "Failed to link candidate to vacancy.";
+  const normalized = error.toLowerCase();
+  if (normalized.includes("duplicate") || normalized.includes("unique")) {
+    return "This candidate is already linked to the selected vacancy.";
+  }
+  if (normalized.includes("foreign key")) {
+    return "Please select a valid candidate and vacancy.";
+  }
+  return "Failed to link candidate to vacancy.";
+}
+
 async function safeAuditLog(input: Parameters<typeof writeAuditLog>[0]) {
   try {
     await writeAuditLog(input);
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
 }
 
@@ -144,7 +157,7 @@ export async function createApplicationAction(input: ApplicationCreateInput): Pr
     officeId: vacancyScope.officeId,
   });
   const result = await createApplication(parsed.data);
-  if (!result.ok) return failure(result.error ?? "Failed to create application.");
+  if (!result.ok) return failure(toFriendlyApplicationCreateError(result.error));
   if (result.applicationId) {
     await safeAuditLog({
       eventType: "recruitment.application_created",
@@ -156,6 +169,8 @@ export async function createApplicationAction(input: ApplicationCreateInput): Pr
     });
   }
   revalidatePath(`/recruitment/applicants/${parsed.data.applicantId}`);
+  revalidatePath("/recruitment/vacancies");
+  revalidatePath(`/recruitment/vacancies/${parsed.data.vacancyId}`);
   return success(result.applicationId ?? undefined);
 }
 
@@ -180,6 +195,7 @@ export async function updateApplicationStatusAction(applicationId: string, input
     metadata: parsed.data,
   });
   revalidatePath(`/recruitment/applicants/${scope.applicantId}`);
+  revalidatePath("/recruitment/vacancies");
   return success(applicationId);
 }
 

@@ -1,5 +1,9 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { OfficeFormInput, OfficeTypeValue } from "@/features/admin/organization/schemas/office-form.schema";
+import type { AuthorizationContext } from "@/features/auth/types";
+import type {
+  OfficeFormInput,
+  OfficeTypeValue,
+} from "@/features/admin/organization/schemas/office-form.schema";
 import type { OfficeListItem } from "@/features/admin/organization/types";
 
 export type OfficeSnapshot = {
@@ -11,7 +15,9 @@ export type OfficeSnapshot = {
   isActive: boolean;
 };
 
-export type CreateOfficeResult = { ok: true; officeId: string } | { ok: false; error: string };
+export type CreateOfficeResult =
+  | { ok: true; officeId: string }
+  | { ok: false; error: string };
 
 export type SimpleMutationResult = { ok: true } | { ok: false; error: string };
 
@@ -44,6 +50,14 @@ function typedQuery<T>(value: unknown): QueryResult<T> {
   return value as QueryResult<T>;
 }
 
+function isGlobalOrganizationAdmin(context?: AuthorizationContext): boolean {
+  return (
+    !context ||
+    context.isSuperAdmin ||
+    context.roles.includes("central_hr_admin")
+  );
+}
+
 function mapOfficeRow(row: OfficeRow): OfficeListItem {
   const campusName = row.campus?.name ?? "";
   const campusSortOrder = row.campus?.sort_order ?? 0;
@@ -73,7 +87,9 @@ function sortOfficeListItems(items: OfficeListItem[]): OfficeListItem[] {
   });
 }
 
-export async function getOfficeSnapshot(officeId: string): Promise<OfficeSnapshot | null> {
+export async function getOfficeSnapshot(
+  officeId: string,
+): Promise<OfficeSnapshot | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = typedQuery<OfficeSnapshotRow>(
     await supabase
@@ -96,16 +112,20 @@ export async function getOfficeSnapshot(officeId: string): Promise<OfficeSnapsho
   };
 }
 
-export async function listOffices(): Promise<OfficeListItem[]> {
+export async function listOffices(
+  context?: AuthorizationContext,
+): Promise<OfficeListItem[]> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = typedQuery<OfficeRow[]>(
-    await supabase
-      .from("offices")
-      .select(
-        "id, campus_id, code, name, sort_order, office_type, is_active, created_at, campus:campuses(name, sort_order)",
-      )
-      .is("deleted_at", null),
-  );
+  let query = supabase
+    .from("offices")
+    .select(
+      "id, campus_id, code, name, sort_order, office_type, is_active, created_at, campus:campuses(name, sort_order)",
+    )
+    .is("deleted_at", null);
+  if (!isGlobalOrganizationAdmin(context) && context?.campusScopes.length) {
+    query = query.in("campus_id", context.campusScopes);
+  }
+  const { data, error } = typedQuery<OfficeRow[]>(await query);
 
   if (error) {
     throw new Error(error.message);
@@ -115,7 +135,9 @@ export async function listOffices(): Promise<OfficeListItem[]> {
   return sortOfficeListItems(rows.map(mapOfficeRow));
 }
 
-export async function createOffice(input: OfficeFormInput): Promise<CreateOfficeResult> {
+export async function createOffice(
+  input: OfficeFormInput,
+): Promise<CreateOfficeResult> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = typedQuery<OfficeIdRow>(
     await supabase
@@ -139,7 +161,10 @@ export async function createOffice(input: OfficeFormInput): Promise<CreateOffice
   return { ok: true, officeId: data.id };
 }
 
-export async function updateOffice(officeId: string, input: OfficeFormInput): Promise<SimpleMutationResult> {
+export async function updateOffice(
+  officeId: string,
+  input: OfficeFormInput,
+): Promise<SimpleMutationResult> {
   const supabase = await createSupabaseServerClient();
   const { error } = typedQuery<null>(
     await supabase
@@ -162,10 +187,16 @@ export async function updateOffice(officeId: string, input: OfficeFormInput): Pr
   return { ok: true };
 }
 
-export async function setOfficeActive(officeId: string, isActive: boolean): Promise<SimpleMutationResult> {
+export async function setOfficeActive(
+  officeId: string,
+  isActive: boolean,
+): Promise<SimpleMutationResult> {
   const supabase = await createSupabaseServerClient();
   const { error } = typedQuery<null>(
-    await supabase.from("offices").update({ is_active: isActive } as never).eq("id", officeId),
+    await supabase
+      .from("offices")
+      .update({ is_active: isActive } as never)
+      .eq("id", officeId),
   );
 
   if (error) {

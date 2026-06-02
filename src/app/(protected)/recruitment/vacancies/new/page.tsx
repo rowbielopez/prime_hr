@@ -36,6 +36,7 @@ export default async function NewVacancyPage() {
           postedAt: null,
           closingAt: null,
           remarks: null,
+          requiredDocuments: [],
         }}
         campusOptions={campuses}
         officeOptions={offices}

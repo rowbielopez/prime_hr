@@ -26,6 +26,13 @@ export type EmployeeSearchResult = {
   campusName: string | null;
 };
 
+export type EmployeeEmailAssignmentSearchResult = EmployeeSearchResult & {
+  officeName: string | null;
+  linkedAccountEmail: string | null;
+  linkedAccountStatus: "active" | "inactive" | "suspended" | null;
+  linkedAccountIsActive: boolean | null;
+};
+
 export type RoleOption = {
   id: string;
   code: string;
@@ -47,4 +54,3 @@ export type OfficeOption = {
   name: string;
   code: string;
 };
-

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/features/audit/server/write-audit-log";
+import { logServerError } from "@/lib/logging/server-logger";
 import { requirePermission } from "@/features/auth/server/require-permission";
 import { indicatorFormSchema, type IndicatorFormInput } from "@/features/compliance/indicators/schemas/indicator-form.schema";
 import {
@@ -36,7 +37,7 @@ export async function createComplianceIndicatorAction(input: IndicatorFormInput)
       metadata: { input: parsed.data },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   revalidatePath("/admin/compliance-indicators");
   revalidatePath("/compliance/evidence/new");
@@ -59,7 +60,7 @@ export async function updateComplianceIndicatorAction(indicatorId: string, input
       metadata: { before, after: parsed.data },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   revalidatePath("/admin/compliance-indicators");
   revalidatePath("/compliance/evidence/new");
@@ -80,7 +81,7 @@ export async function toggleComplianceIndicatorStatusAction(indicatorId: string,
       metadata: { before, isActive, previousIsActive: before?.is_active ?? null },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   revalidatePath("/admin/compliance-indicators");
   revalidatePath("/compliance/evidence/new");

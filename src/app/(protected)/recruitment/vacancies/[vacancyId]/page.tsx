@@ -1,8 +1,22 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/foundation";
 import { withProtectedPageMeta } from "@/features/auth/server/with-protected-page-meta";
-import { getVacancyById } from "@/features/recruitment/vacancies/repository/vacancies.repository";
+import { getVacancyById, listApplicationsByVacancyId } from "@/features/recruitment/vacancies/repository/vacancies.repository";
 import { VacancyDetailManagement } from "@/components/features/recruitment/vacancies/vacancy-detail-management";
+import { listApplicants } from "@/features/recruitment/applicants/repository/applicants.repository";
+import type { VacancyApplicationStatusCounts } from "@/features/recruitment/vacancies/types";
+
+function emptyApplicationStatusCounts(): VacancyApplicationStatusCounts {
+  return {
+    submitted: 0,
+    screening: 0,
+    interview: 0,
+    for_offer: 0,
+    hired: 0,
+    rejected: 0,
+    withdrawn: 0,
+  };
+}
 
 export default async function VacancyDetailPage({ params }: { params: Promise<{ vacancyId: string }> }) {
   const { vacancyId } = await params;
@@ -11,17 +25,37 @@ export default async function VacancyDetailPage({ params }: { params: Promise<{ 
     permission: "recruitment.vacancies.read",
   });
   const canManageStatus = context.permissions.includes("recruitment.vacancies.write");
-  const detail = await getVacancyById(vacancyId, context);
+  const canManageApplications = context.permissions.includes("recruitment.applicants.write");
+  const [detail, applications, applicantOptions] = await Promise.all([
+    getVacancyById(vacancyId, context),
+    listApplicationsByVacancyId(vacancyId, context),
+    canManageApplications ? listApplicants(context) : Promise.resolve([]),
+  ]);
   if (!detail) notFound();
+  const applicationStatusCounts = applications.reduce((counts, application) => {
+    counts[application.applicationStatus] += 1;
+    return counts;
+  }, emptyApplicationStatusCounts());
+  const detailWithApplicationSummary = {
+    ...detail,
+    applicantsCount: applications.length,
+    applicationStatusCounts,
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={detail.title}
+        title={detailWithApplicationSummary.title}
         subtitle="Vacancy details, scope association, and status handling."
-        breadcrumb={[...pageMeta.breadcrumb, { label: detail.title }]}
+        breadcrumb={[...pageMeta.breadcrumb, { label: detailWithApplicationSummary.title }]}
       />
-      <VacancyDetailManagement detail={detail} canManageStatus={canManageStatus} />
+      <VacancyDetailManagement
+        detail={detailWithApplicationSummary}
+        applications={applications}
+        applicantOptions={applicantOptions}
+        canManageStatus={canManageStatus}
+        canManageApplications={canManageApplications}
+      />
     </div>
   );
 }

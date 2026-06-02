@@ -62,6 +62,7 @@ const WORKSPACE_NAV_SECTIONS: WorkspaceNavSection[] = [
     match: (item) =>
       item.href.startsWith("/employees") ||
       item.href.startsWith("/pds") ||
+      item.href.startsWith("/requests") ||
       item.href.includes("campus") ||
       item.href.includes("offices"),
   },

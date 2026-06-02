@@ -1,37 +1,48 @@
-import { MessageSquareWarning } from "lucide-react";
 import { PageHeader } from "@/components/foundation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { NoEmployeeLink } from "@/components/features/me/no-employee-link";
+import { MyRequestsList } from "@/components/features/requests/my-requests-list";
+import { MyRequestsSummaryCards } from "@/components/features/requests/my-requests-summary-cards";
 import { withProtectedPageMeta } from "@/features/auth/server/with-protected-page-meta";
+import { getMyEmployee } from "@/features/me/repository/me.repository";
+import { listMyEmployeeRequests } from "@/features/requests/repository/requests.repository";
+import type { EmployeeRequestListItem, EmployeeRequestSummary } from "@/features/requests/types";
+
+function summarizeRequests(requests: EmployeeRequestListItem[]): EmployeeRequestSummary {
+    return {
+        total: requests.length,
+        pending: requests.filter((request) => request.status === "submitted").length,
+        underReview: requests.filter((request) => request.status === "under_review").length,
+        returned: requests.filter((request) => request.status === "returned_for_revision").length,
+        approved: requests.filter((request) => request.status === "approved").length,
+        completed: requests.filter((request) => request.status === "completed").length,
+    };
+}
 
 export default async function MyRequestsPage() {
-    const { pageMeta } = await withProtectedPageMeta({ pathname: "/me/requests" });
+    const { context, pageMeta } = await withProtectedPageMeta({ pathname: "/me/requests" });
+    const me = await getMyEmployee(context.appUserId);
+
+    if (!me?.employee) {
+        return (
+            <div className="space-y-6">
+                <PageHeader title={pageMeta.title} subtitle={pageMeta.subtitle} breadcrumb={pageMeta.breadcrumb} />
+                <NoEmployeeLink />
+            </div>
+        );
+    }
+
+    const requests = await listMyEmployeeRequests(me.employee.id);
+    const summary = summarizeRequests(requests);
 
     return (
         <div className="space-y-6">
-            <PageHeader title={pageMeta.title} subtitle={pageMeta.subtitle} breadcrumb={pageMeta.breadcrumb} />
-
-            <Card>
-                <CardHeader className="border-b">
-                    <CardTitle className="text-base">My Requests</CardTitle>
-                    <p className="text-xs text-muted-foreground">
-                        Submit and track requests to HR — for example, corrections to your name, position, or employment details.
-                    </p>
-                </CardHeader>
-                <CardContent className="pt-4">
-                    <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border/70 bg-muted/30 px-6 py-10 text-center">
-                        <MessageSquareWarning className="h-8 w-8 text-muted-foreground" />
-                        <p className="text-sm font-medium">Requests are coming soon</p>
-                        <p className="max-w-md text-xs text-muted-foreground">
-                            This feature is being prepared. In the meantime, please contact your HR officer directly for any
-                            corrections or special requests.
-                        </p>
-                        <Button variant="outline" disabled className="mt-2">
-                            New request (coming soon)
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
+            <PageHeader
+                title={pageMeta.title}
+                subtitle="Submit and track your HR-related requests and corrections."
+                breadcrumb={pageMeta.breadcrumb}
+            />
+            <MyRequestsSummaryCards summary={summary} />
+            <MyRequestsList requests={requests} />
         </div>
     );
 }

@@ -85,3 +85,72 @@ export type EmployeeDocumentListItem = {
   status: string;
   createdAt: string;
 };
+
+export type EmployeeProfileIssue = {
+  key: string;
+  label: string;
+  description: string;
+  severity: "info" | "warning" | "critical";
+};
+
+export type EmployeeProfileCompletion = {
+  percentage: number;
+  completedItems: number;
+  totalItems: number;
+  missingItems: string[];
+};
+
+export type EmployeeProfilePdsSummary = {
+  status: string | null;
+  completionScore: number | null;
+  updatedAt: string | null;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  verifiedAt: string | null;
+  returnedAt: string | null;
+  returnReason: string | null;
+};
+
+export type EmployeeRequiredDocumentStatus = {
+  key: string;
+  label: string;
+  status: "missing" | "uploaded" | "pending_review" | "verified" | "rejected";
+};
+
+export type EmployeeProfileDocumentSummary = {
+  totalUploaded: number;
+  verifiedCount: number;
+  pendingCount: number;
+  rejectedCount: number;
+  missingCount: number;
+  lastUploadedAt: string | null;
+  requiredDocuments: EmployeeRequiredDocumentStatus[];
+};
+
+export type EmployeeProfileServiceRecordSummary = {
+  entriesCount: number;
+  hasCurrentRecord: boolean;
+  needsReview: boolean;
+  currentPosition: string | null;
+  currentDateFrom: string | null;
+  currentDateTo: string | null;
+  latestServiceDate: string | null;
+  lastUpdated: string | null;
+  warningsCount: number;
+};
+
+export type EmployeeProfileRecruitmentSummary = {
+  applicantId: string;
+  applicantName: string;
+  status: string;
+  updatedAt: string;
+} | null;
+
+export type EmployeeProfileHubSummary = {
+  completion: EmployeeProfileCompletion;
+  issues: EmployeeProfileIssue[];
+  pds: EmployeeProfilePdsSummary;
+  documents: EmployeeProfileDocumentSummary;
+  serviceRecord: EmployeeProfileServiceRecordSummary;
+  recruitment: EmployeeProfileRecruitmentSummary;
+};

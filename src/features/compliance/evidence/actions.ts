@@ -2,13 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/features/audit/server/write-audit-log";
+import { logServerError } from "@/lib/logging/server-logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isComplianceGlobalAdmin } from "@/features/compliance/evidence/compliance-access";
 import { assertValidEvidenceStatusTransition } from "@/features/compliance/evidence/status-transitions";
 import { requirePermission } from "@/features/auth/server/require-permission";
 import { officeBelongsToCampus } from "@/features/admin/organization/repository/scope.repository";
-import { evidenceFormSchema, type EvidenceFormInput } from "@/features/compliance/evidence/schemas/evidence-form.schema";
-import { statusUpdateSchema, type StatusUpdateInput } from "@/features/compliance/evidence/schemas/status-update.schema";
+import {
+  evidenceFormSchema,
+  type EvidenceFormInput,
+} from "@/features/compliance/evidence/schemas/evidence-form.schema";
+import {
+  statusUpdateSchema,
+  type StatusUpdateInput,
+} from "@/features/compliance/evidence/schemas/status-update.schema";
 import {
   evidenceActionPlanSchema,
   evidenceAttachmentSchema,
@@ -30,14 +37,48 @@ import {
   updateEvidenceStatus,
 } from "@/features/compliance/evidence/repository/evidence.repository";
 
-type ActionResult = { ok: true; evidenceId?: string } | { ok: false; error: string };
-type AttachmentSignedUrlResult = { ok: true; url: string } | { ok: false; error: string };
-type AttachmentUploadResult = { ok: true; evidenceId: string } | { ok: false; error: string };
-type AttachmentDeleteResult = { ok: true; evidenceId: string } | { ok: false; error: string };
-type AttachmentRestoreResult = { ok: true; evidenceId: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; evidenceId?: string }
+  | { ok: false; error: string };
+type AttachmentSignedUrlResult =
+  | { ok: true; url: string }
+  | { ok: false; error: string };
+type AttachmentUploadResult =
+  | { ok: true; evidenceId: string }
+  | { ok: false; error: string };
+type AttachmentDeleteResult =
+  | { ok: true; evidenceId: string }
+  | { ok: false; error: string };
+type AttachmentRestoreResult =
+  | { ok: true; evidenceId: string }
+  | { ok: false; error: string };
 
 const EVIDENCE_STORAGE_BUCKET = "compliance-evidence";
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20MB
+
+/**
+ * Allowed MIME types for evidence attachments.
+ * Restricts uploads to documents, images, and spreadsheets only.
+ */
+const ALLOWED_MIME_TYPES = new Set([
+  // PDF
+  "application/pdf",
+  // Office documents
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  // Images
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  // Plain text / CSV
+  "text/plain",
+  "text/csv",
+]);
 
 function success(evidenceId?: string): ActionResult {
   return { ok: true, evidenceId };
@@ -55,17 +96,30 @@ function sanitizeFileName(input: string): string {
     .slice(0, 120);
 }
 
-function buildStoragePath(input: { campusId: string; evidenceId: string; originalFileName: string }): string {
+function buildStoragePath(input: {
+  campusId: string;
+  evidenceId: string;
+  originalFileName: string;
+}): string {
   const safeName = sanitizeFileName(input.originalFileName) || "attachment.bin";
   return `campus/${input.campusId}/evidence/${input.evidenceId}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
 }
 
-export async function createEvidenceAction(input: EvidenceFormInput): Promise<ActionResult> {
+export async function createEvidenceAction(
+  input: EvidenceFormInput,
+): Promise<ActionResult> {
   const parsed = evidenceFormSchema.safeParse(input);
-  if (!parsed.success) return failure(parsed.error.issues[0]?.message ?? "Invalid compliance evidence input.");
+  if (!parsed.success)
+    return failure(
+      parsed.error.issues[0]?.message ?? "Invalid compliance evidence input.",
+    );
   if (parsed.data.officeId) {
-    const officeIsValid = await officeBelongsToCampus({ officeId: parsed.data.officeId, campusId: parsed.data.campusId });
-    if (!officeIsValid) return failure("Selected office does not belong to selected campus.");
+    const officeIsValid = await officeBelongsToCampus({
+      officeId: parsed.data.officeId,
+      campusId: parsed.data.campusId,
+    });
+    if (!officeIsValid)
+      return failure("Selected office does not belong to selected campus.");
   }
   await requirePermission({
     permission: "compliance.evidence.write",
@@ -82,18 +136,25 @@ export async function createEvidenceAction(input: EvidenceFormInput): Promise<Ac
         entityType: "compliance_evidence",
         entityId: result.evidenceId,
         campusId: parsed.data.campusId,
-        metadata: { title: parsed.data.title, indicatorId: parsed.data.indicatorId },
+        metadata: {
+          title: parsed.data.title,
+          indicatorId: parsed.data.indicatorId,
+        },
       });
     } catch (error) {
-      console.error("audit_log_failed", error);
+      logServerError("audit_log_failed", error);
     }
   }
   revalidatePath("/compliance/evidence");
-  if (result.evidenceId) revalidatePath(`/compliance/evidence/${result.evidenceId}`);
+  if (result.evidenceId)
+    revalidatePath(`/compliance/evidence/${result.evidenceId}`);
   return success(result.evidenceId ?? undefined);
 }
 
-export async function updateEvidenceAction(evidenceId: string, input: EvidenceFormInput): Promise<ActionResult> {
+export async function updateEvidenceAction(
+  evidenceId: string,
+  input: EvidenceFormInput,
+): Promise<ActionResult> {
   const row = await getEvidenceMutationContext(evidenceId);
   if (!row) return failure("Evidence not found.");
   const ctx = await requirePermission({
@@ -102,13 +163,22 @@ export async function updateEvidenceAction(evidenceId: string, input: EvidenceFo
     officeId: row.officeId,
   });
   if (row.status === "approved" && !isComplianceGlobalAdmin(ctx)) {
-    return failure("Approved evidence is locked. Only central HR administrators may edit it.");
+    return failure(
+      "Approved evidence is locked. Only central HR administrators may edit it.",
+    );
   }
   const parsed = evidenceFormSchema.safeParse(input);
-  if (!parsed.success) return failure(parsed.error.issues[0]?.message ?? "Invalid compliance evidence input.");
+  if (!parsed.success)
+    return failure(
+      parsed.error.issues[0]?.message ?? "Invalid compliance evidence input.",
+    );
   if (parsed.data.officeId) {
-    const officeIsValid = await officeBelongsToCampus({ officeId: parsed.data.officeId, campusId: parsed.data.campusId });
-    if (!officeIsValid) return failure("Selected office does not belong to selected campus.");
+    const officeIsValid = await officeBelongsToCampus({
+      officeId: parsed.data.officeId,
+      campusId: parsed.data.campusId,
+    });
+    if (!officeIsValid)
+      return failure("Selected office does not belong to selected campus.");
   }
   await requirePermission({
     permission: "compliance.evidence.write",
@@ -126,18 +196,25 @@ export async function updateEvidenceAction(evidenceId: string, input: EvidenceFo
       campusId: parsed.data.campusId,
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   revalidatePath("/compliance/evidence");
   revalidatePath(`/compliance/evidence/${evidenceId}`);
   return success(evidenceId);
 }
 
-export async function updateEvidenceStatusAction(evidenceId: string, input: StatusUpdateInput): Promise<ActionResult> {
+export async function updateEvidenceStatusAction(
+  evidenceId: string,
+  input: StatusUpdateInput,
+): Promise<ActionResult> {
   const parsed = statusUpdateSchema.safeParse(input);
-  if (!parsed.success) return failure(parsed.error.issues[0]?.message ?? "Invalid status update.");
+  if (!parsed.success)
+    return failure(parsed.error.issues[0]?.message ?? "Invalid status update.");
   const normalizedRemarks = parsed.data.remarks?.trim() ?? "";
-  if ((parsed.data.status === "approved" || parsed.data.status === "rejected") && normalizedRemarks.length === 0) {
+  if (
+    (parsed.data.status === "approved" || parsed.data.status === "rejected") &&
+    normalizedRemarks.length === 0
+  ) {
     return failure("Remarks are required for approved/rejected decisions.");
   }
   const row = await getEvidenceMutationContext(evidenceId);
@@ -151,14 +228,19 @@ export async function updateEvidenceStatusAction(evidenceId: string, input: Stat
     campusId: row.campusId,
     officeId: row.officeId,
   });
-  const transition = assertValidEvidenceStatusTransition(row.status, parsed.data.status, isComplianceGlobalAdmin(ctx));
+  const transition = assertValidEvidenceStatusTransition(
+    row.status,
+    parsed.data.status,
+    isComplianceGlobalAdmin(ctx),
+  );
   if (!transition.ok) return failure(transition.error);
   const result = await updateEvidenceStatus({
     evidenceId,
     status: parsed.data.status,
     remarks: parsed.data.remarks,
   });
-  if (!result.ok) return failure(result.error ?? "Failed to update evidence status.");
+  if (!result.ok)
+    return failure(result.error ?? "Failed to update evidence status.");
   try {
     await writeAuditLog({
       eventType: "compliance.evidence_status_updated",
@@ -169,7 +251,7 @@ export async function updateEvidenceStatusAction(evidenceId: string, input: Stat
       metadata: { status: parsed.data.status },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   revalidatePath("/compliance/evidence");
   revalidatePath(`/compliance/evidence/${evidenceId}`);
@@ -177,9 +259,14 @@ export async function updateEvidenceStatusAction(evidenceId: string, input: Stat
   return success(evidenceId);
 }
 
-export async function addEvidenceAttachmentAction(input: EvidenceAttachmentInput): Promise<ActionResult> {
+export async function addEvidenceAttachmentAction(
+  input: EvidenceAttachmentInput,
+): Promise<ActionResult> {
   const parsed = evidenceAttachmentSchema.safeParse(input);
-  if (!parsed.success) return failure(parsed.error.issues[0]?.message ?? "Invalid attachment input.");
+  if (!parsed.success)
+    return failure(
+      parsed.error.issues[0]?.message ?? "Invalid attachment input.",
+    );
   const scope = await getEvidenceScopeById(parsed.data.evidenceId);
   if (!scope) return failure("Evidence not found.");
   const context = await requirePermission({
@@ -192,7 +279,8 @@ export async function addEvidenceAttachmentAction(input: EvidenceAttachmentInput
     storageBucket: parsed.data.storageBucket ?? EVIDENCE_STORAGE_BUCKET,
     uploadedByUserId: context.appUserId,
   });
-  if (!result.ok) return failure(result.error ?? "Failed to add attachment metadata.");
+  if (!result.ok)
+    return failure(result.error ?? "Failed to add attachment metadata.");
   try {
     await writeAuditLog({
       eventType: "compliance.attachment_added",
@@ -208,15 +296,20 @@ export async function addEvidenceAttachmentAction(input: EvidenceAttachmentInput
       },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   revalidatePath(`/compliance/evidence/${parsed.data.evidenceId}`);
   return success(parsed.data.evidenceId);
 }
 
-export async function saveEvidenceActionPlanAction(input: EvidenceActionPlanInput): Promise<ActionResult> {
+export async function saveEvidenceActionPlanAction(
+  input: EvidenceActionPlanInput,
+): Promise<ActionResult> {
   const parsed = evidenceActionPlanSchema.safeParse(input);
-  if (!parsed.success) return failure(parsed.error.issues[0]?.message ?? "Invalid action plan input.");
+  if (!parsed.success)
+    return failure(
+      parsed.error.issues[0]?.message ?? "Invalid action plan input.",
+    );
   const scope = await getEvidenceScopeById(parsed.data.evidenceId);
   if (!scope) return failure("Evidence not found.");
   await requirePermission({
@@ -229,7 +322,9 @@ export async function saveEvidenceActionPlanAction(input: EvidenceActionPlanInpu
   // This keeps action plans comparable and prevents “floating” due dates across periods.
   const period = await getEvidenceReportingPeriodById(parsed.data.evidenceId);
   if (period && !parsed.data.dueDate.startsWith(`${period}-`)) {
-    return failure(`Due date must be within the evidence reporting period (${period}).`);
+    return failure(
+      `Due date must be within the evidence reporting period (${period}).`,
+    );
   }
   const result = await saveEvidenceActionPlan(parsed.data);
   if (!result.ok) return failure(result.error ?? "Failed to save action plan.");
@@ -243,7 +338,7 @@ export async function saveEvidenceActionPlanAction(input: EvidenceActionPlanInpu
       metadata: { status: parsed.data.status, dueDate: parsed.data.dueDate },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   revalidatePath(`/compliance/evidence/${parsed.data.evidenceId}`);
   revalidatePath("/compliance/dashboard");
@@ -260,7 +355,16 @@ export async function uploadEvidenceAttachmentAction(
   const file = formData.get("file");
   if (!(file instanceof File)) return { ok: false, error: "No file selected." };
   if (file.size <= 0) return { ok: false, error: "Selected file is empty." };
-  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: "File exceeds 20MB upload limit." };
+  if (file.size > MAX_UPLOAD_BYTES)
+    return { ok: false, error: "File exceeds 20MB upload limit." };
+  const mimeType = file.type || "application/octet-stream";
+  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+    return {
+      ok: false,
+      error:
+        "File type not allowed. Please upload a PDF, Word document, spreadsheet, image, or plain-text file.",
+    };
+  }
 
   const scope = await getEvidenceScopeById(evidenceId);
   if (!scope) return { ok: false, error: "Evidence not found." };
@@ -281,7 +385,7 @@ export async function uploadEvidenceAttachmentAction(
   const uploadResult = await admin.storage
     .from(EVIDENCE_STORAGE_BUCKET)
     .upload(storagePath, file, {
-      contentType: file.type || "application/octet-stream",
+      contentType: mimeType,
       upsert: false,
       cacheControl: "3600",
     });
@@ -292,7 +396,7 @@ export async function uploadEvidenceAttachmentAction(
   const attachmentResult = await addEvidenceAttachment({
     evidenceId,
     fileName: file.name,
-    fileType: file.type || "application/octet-stream",
+    fileType: mimeType,
     storageBucket: EVIDENCE_STORAGE_BUCKET,
     storagePath,
     uploadedByUserId: context.appUserId,
@@ -300,7 +404,10 @@ export async function uploadEvidenceAttachmentAction(
 
   if (!attachmentResult.ok) {
     await admin.storage.from(EVIDENCE_STORAGE_BUCKET).remove([storagePath]);
-    return { ok: false, error: attachmentResult.error ?? "Failed to save attachment record." };
+    return {
+      ok: false,
+      error: attachmentResult.error ?? "Failed to save attachment record.",
+    };
   }
 
   try {
@@ -319,14 +426,16 @@ export async function uploadEvidenceAttachmentAction(
       },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
 
   revalidatePath(`/compliance/evidence/${evidenceId}`);
   return { ok: true, evidenceId };
 }
 
-export async function getEvidenceAttachmentSignedUrlAction(attachmentId: string): Promise<AttachmentSignedUrlResult> {
+export async function getEvidenceAttachmentSignedUrlAction(
+  attachmentId: string,
+): Promise<AttachmentSignedUrlResult> {
   const access = await getAttachmentAccessContext(attachmentId);
   if (!access) return { ok: false, error: "Attachment not found." };
 
@@ -337,7 +446,10 @@ export async function getEvidenceAttachmentSignedUrlAction(attachmentId: string)
   });
 
   if (!access.storagePath) {
-    return { ok: false, error: "Attachment does not have a storage object path." };
+    return {
+      ok: false,
+      error: "Attachment does not have a storage object path.",
+    };
   }
 
   const admin = createSupabaseAdminClient();
@@ -345,7 +457,10 @@ export async function getEvidenceAttachmentSignedUrlAction(attachmentId: string)
     .from(access.storageBucket || EVIDENCE_STORAGE_BUCKET)
     .createSignedUrl(access.storagePath, 60 * 10);
   if (error || !data?.signedUrl) {
-    return { ok: false, error: error?.message ?? "Failed to generate signed URL." };
+    return {
+      ok: false,
+      error: error?.message ?? "Failed to generate signed URL.",
+    };
   }
 
   try {
@@ -362,7 +477,7 @@ export async function getEvidenceAttachmentSignedUrlAction(attachmentId: string)
       },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   return { ok: true, url: data.signedUrl };
 }
@@ -387,7 +502,10 @@ export async function softDeleteEvidenceAttachmentAction(input: {
       .from(access.storageBucket || EVIDENCE_STORAGE_BUCKET)
       .remove([access.storagePath]);
     if (removeResult.error) {
-      return { ok: false, error: `Failed to delete object from storage: ${removeResult.error.message}` };
+      return {
+        ok: false,
+        error: `Failed to delete object from storage: ${removeResult.error.message}`,
+      };
     }
     storageDeleted = true;
   }
@@ -415,20 +533,23 @@ export async function softDeleteEvidenceAttachmentAction(input: {
       },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
 
   revalidatePath(`/compliance/evidence/${access.evidenceId}`);
   return { ok: true, evidenceId: access.evidenceId };
 }
 
-export async function restoreEvidenceAttachmentAction(input: { attachmentId: string }): Promise<AttachmentRestoreResult> {
+export async function restoreEvidenceAttachmentAction(input: {
+  attachmentId: string;
+}): Promise<AttachmentRestoreResult> {
   const access = await getDeletedAttachmentAccessContext(input.attachmentId);
   if (!access) return { ok: false, error: "Deleted attachment not found." };
   if (access.storageDeletedAt) {
     return {
       ok: false,
-      error: "This attachment cannot be restored because its storage object was permanently deleted.",
+      error:
+        "This attachment cannot be restored because its storage object was permanently deleted.",
     };
   }
 
@@ -438,7 +559,9 @@ export async function restoreEvidenceAttachmentAction(input: { attachmentId: str
     officeId: access.officeId,
   });
 
-  const result = await restoreEvidenceAttachment({ attachmentId: input.attachmentId });
+  const result = await restoreEvidenceAttachment({
+    attachmentId: input.attachmentId,
+  });
   if (!result.ok) return { ok: false, error: result.error };
 
   try {
@@ -456,7 +579,7 @@ export async function restoreEvidenceAttachmentAction(input: { attachmentId: str
       },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
 
   revalidatePath(`/compliance/evidence/${access.evidenceId}`);

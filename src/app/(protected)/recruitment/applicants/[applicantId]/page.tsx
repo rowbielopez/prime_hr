@@ -11,14 +11,22 @@ import {
 import { getApplicantById } from "@/features/recruitment/applicants/repository/applicants.repository";
 import { listVacancies } from "@/features/recruitment/vacancies/repository/vacancies.repository";
 
-export default async function ApplicantDetailPage({ params }: { params: Promise<{ applicantId: string }> }) {
+export default async function ApplicantDetailPage({
+  params,
+}: {
+  params: Promise<{ applicantId: string }>;
+}) {
   const { applicantId } = await params;
   const { context, pageMeta } = await withProtectedPageMeta({
     pathname: "/recruitment/applicants",
     permission: "recruitment.applicants.read",
   });
-  const canEditApplicant = context.permissions.includes("recruitment.applicants.write");
-  const canManageApplications = context.permissions.includes("recruitment.applicants.write");
+  const canEditApplicant = context.permissions.includes(
+    "recruitment.applicants.write",
+  );
+  const canManageApplications = context.permissions.includes(
+    "recruitment.applicants.write",
+  );
   const [detail, vacancies] = await Promise.all([
     getApplicantById(applicantId, context),
     listVacancies(context),
@@ -34,11 +42,14 @@ export default async function ApplicantDetailPage({ params }: { params: Promise<
       />
       <ApplicantDetailManagement
         detail={detail}
-        vacancyOptions={vacancies.map((vacancy) => ({ id: vacancy.id, title: vacancy.title }))}
+        vacancyOptions={vacancies.map((vacancy) => ({
+          id: vacancy.id,
+          title: vacancy.title,
+        }))}
         canEditApplicant={canEditApplicant}
         canManageApplications={canManageApplications}
         onCreateApplication={createApplicationAction}
-        onUpdateApplicationStatus={(applicationId, input) => updateApplicationStatusAction(applicationId, input)}
+        onUpdateApplicationStatus={updateApplicationStatusAction}
         onCreateScreeningResult={createScreeningResultAction}
         onCreateInterviewRecord={createInterviewRecordAction}
       />

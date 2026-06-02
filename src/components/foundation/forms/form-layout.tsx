@@ -46,9 +46,10 @@ export function FormField({ label, htmlFor, hint, children }: FormFieldProps) {
 type FormGridProps = {
   columns?: 1 | 2;
   children: ReactNode;
+  className?: string;
 };
 
-export function FormGrid({ columns = 2, children }: FormGridProps) {
-  return <div className={cn("grid gap-4", columns === 2 ? "md:grid-cols-2" : "grid-cols-1")}>{children}</div>;
+export function FormGrid({ columns = 2, children, className }: FormGridProps) {
+  return <div className={cn("grid gap-4", columns === 2 ? "md:grid-cols-2" : "grid-cols-1", className)}>{children}</div>;
 }
 

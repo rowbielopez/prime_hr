@@ -1,6 +1,19 @@
-export type ApplicantStatus = "new" | "screening" | "shortlisted" | "hired" | "rejected" | "withdrawn";
+export type ApplicantStatus =
+  | "new"
+  | "screening"
+  | "shortlisted"
+  | "hired"
+  | "rejected"
+  | "withdrawn";
 
-export type ApplicationStatus = "submitted" | "screening" | "interview" | "for_offer" | "hired" | "rejected" | "withdrawn";
+export type ApplicationStatus =
+  | "submitted"
+  | "screening"
+  | "interview"
+  | "for_offer"
+  | "hired"
+  | "rejected"
+  | "withdrawn";
 
 export type ApplicantListItem = {
   id: string;
@@ -12,9 +25,17 @@ export type ApplicantListItem = {
   officeId: string | null;
   officeName: string | null;
   status: ApplicantStatus;
+  source: string | null;
   applicationsCount: number;
   convertedEmployeeId: string | null;
   updatedAt: string;
+  // Latest application enrichment (null when no applications are linked)
+  latestApplicationId: string | null;
+  latestApplicationStatus: ApplicationStatus | null;
+  latestApplicationAppliedAt: string | null;
+  latestVacancyTitle: string | null;
+  latestPlantillaItemNo: string | null;
+  latestVacancyEmploymentType: string | null;
 };
 
 export type ApplicationRecord = {
@@ -22,6 +43,8 @@ export type ApplicationRecord = {
   applicantId: string;
   vacancyId: string;
   vacancyTitle: string;
+  plantillaItemNo: string | null;
+  employmentType: string | null;
   campusId: string;
   campusName: string;
   officeId: string | null;
@@ -75,6 +98,7 @@ export type ApplicantDetail = {
   officeName: string | null;
   status: ApplicantStatus;
   notes: string | null;
+  source: string | null;
   convertedEmployeeId: string | null;
   updatedAt: string;
   applications: ApplicationRecord[];

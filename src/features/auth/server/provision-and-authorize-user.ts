@@ -1,6 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { hasAnyActiveRole } from "@/features/auth/server/authorization-predicates";
+import { logServerError } from "@/lib/logging/server-logger";
 import type { Database } from "@/lib/db/types";
 import type { Json } from "@/lib/db/types";
 
@@ -96,7 +97,7 @@ export async function provisionAndAuthorizeUser(authUser: User): Promise<Provisi
       .maybeSingle();
 
     if (existingUserError) {
-      console.error("[provision] app_users select failed:", existingUserError);
+      logServerError("[provision] app_users select failed", existingUserError);
       return { allowed: false, reason: "profile_resolution_failed" };
     }
 
@@ -169,7 +170,7 @@ export async function provisionAndAuthorizeUser(authUser: User): Promise<Provisi
             return { allowed: true };
           }
         }
-        console.error("[provision] app_users upsert failed:", createError);
+        logServerError("[provision] app_users upsert failed", createError);
         return { allowed: false, reason: "profile_resolution_failed" };
       }
 
@@ -226,7 +227,7 @@ export async function provisionAndAuthorizeUser(authUser: User): Promise<Provisi
 
     return { allowed: true };
   } catch (err) {
-    console.error("[provision] unexpected error:", err);
+    logServerError("[provision] unexpected error", err);
     return { allowed: false, reason: "profile_resolution_failed" };
   }
 }

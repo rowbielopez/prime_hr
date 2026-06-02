@@ -8,6 +8,7 @@ import {
     FileText,
     GraduationCap,
     HeartHandshake,
+    Inbox,
     LayoutDashboard,
     LineChart,
     Settings,
@@ -40,6 +41,7 @@ export const navIconMap: Record<
     settings: Settings,
     "calendar-days": CalendarDays,
     "file-text": FileText,
+    inbox: Inbox,
 };
 
 export const moduleAccentClass: Record<AppModuleColor, string> = {

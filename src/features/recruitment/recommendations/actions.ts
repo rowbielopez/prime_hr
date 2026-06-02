@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/features/audit/server/write-audit-log";
+import { logServerError } from "@/lib/logging/server-logger";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/features/auth/server/require-permission";
 import {
@@ -61,7 +62,7 @@ export async function upsertRankingEntryAction(input: RankingEntryInput): Promis
       },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   revalidatePath("/recruitment/ranking");
   return success();
@@ -105,7 +106,7 @@ export async function upsertRecommendationAction(input: RecommendationInput): Pr
       },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   revalidatePath("/recruitment/recommendations");
   if (result.recommendationId) revalidatePath(`/recruitment/recommendations/${result.recommendationId}`);
@@ -150,7 +151,7 @@ export async function updateRecommendationStatusAction(
       metadata: { beforeStatus: currentStatus, afterStatus: parsed.data.status, remarks: parsed.data.remarks ?? null },
     });
   } catch (error) {
-    console.error("audit_log_failed", error);
+    logServerError("audit_log_failed", error);
   }
   revalidatePath("/recruitment/recommendations");
   revalidatePath(`/recruitment/recommendations/${recommendationId}`);

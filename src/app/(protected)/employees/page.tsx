@@ -6,6 +6,7 @@ import {
   listEmployees,
 } from "@/features/employees/repository/employees.repository";
 import { withProtectedPageMeta } from "@/features/auth/server/with-protected-page-meta";
+import { hasPermission } from "@/lib/rbac/scopes";
 
 export default async function EmployeesPage() {
   const { context, pageMeta } = await withProtectedPageMeta({
@@ -21,9 +22,20 @@ export default async function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={pageMeta.title} subtitle={pageMeta.subtitle} breadcrumb={pageMeta.breadcrumb} />
-      <EmployeeListManagement employees={employees} campuses={campuses} offices={offices} />
+      <PageHeader
+        title={pageMeta.title}
+        subtitle={pageMeta.subtitle}
+        breadcrumb={pageMeta.breadcrumb}
+      />
+      <EmployeeListManagement
+        employees={employees}
+        campuses={campuses}
+        offices={offices}
+        canAssignEmployeeEmail={
+          hasPermission(context, "admin.users.write") ||
+          hasPermission(context, "admin.campus.users.write")
+        }
+      />
     </div>
   );
 }
-

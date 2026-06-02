@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { AppRole } from "@/lib/constants/roles";
 import type { AuthorizationContext } from "@/features/auth/types";
@@ -26,8 +27,18 @@ type UserRoleOfficeLookup = {
   office_id: string;
 };
 
-export async function resolveAuthorizationContext(authUser: User): Promise<AuthorizationContext | null> {
-  const supabase = await createSupabaseServerClient();
+/**
+ * Resolves roles, permissions, and campus/office scopes for an authenticated
+ * user. Wrapped in React `cache()` so the three sequential Supabase lookups
+ * (`app_users` → `user_roles` → `user_role_offices`) run at most once per
+ * request, no matter how many `requirePermission` calls a page performs.
+ *
+ * The cache key is the authenticated user reference, which is itself memoised
+ * by `getAuthenticatedUser`, so all callers within a request share one result.
+ */
+export const resolveAuthorizationContext = cache(
+  async (authUser: User): Promise<AuthorizationContext | null> => {
+    const supabase = await createSupabaseServerClient();
 
   const { data: appUser, error: appUserError } = await supabase
     .from("app_users")
@@ -101,5 +112,6 @@ export async function resolveAuthorizationContext(authUser: User): Promise<Autho
     primaryOfficeId: typedAppUser.primary_office_id,
     isSuperAdmin: roles.includes("super_admin"),
   };
-}
+  },
+);
 

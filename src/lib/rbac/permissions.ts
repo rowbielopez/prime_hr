@@ -6,6 +6,10 @@ export type AppPermission =
   | "admin.users.write"
   | "admin.organization.read"
   | "admin.organization.write"
+  | "admin.campus.users.read"
+  | "admin.campus.users.write"
+  | "admin.campus.organization.read"
+  | "admin.campus.organization.write"
   | "recruitment.vacancies.read"
   | "recruitment.vacancies.write"
   | "recruitment.applicants.read"
@@ -18,8 +22,13 @@ export type AppPermission =
   | "compliance.indicators.write"
   | "compliance.dashboard.read"
   | "audit.logs.read"
+  | "audit.logs.campus.read"
+  | "reports.read"
+  | "reports.export"
   | "employee.records.read"
   | "employee.records.write"
+  | "employee.requests.review.read"
+  | "employee.requests.review.write"
   | "pds.self.read"
   | "pds.self.write"
   | "pds.review.read"
@@ -59,6 +68,9 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
     "admin.users.write",
     "admin.organization.read",
     "admin.organization.write",
+    "admin.campus.users.read",
+    "admin.campus.users.write",
+    "admin.campus.organization.read",
     "recruitment.vacancies.read",
     "recruitment.vacancies.write",
     "recruitment.applicants.read",
@@ -71,8 +83,13 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
     "compliance.indicators.write",
     "compliance.dashboard.read",
     "audit.logs.read",
+    "audit.logs.campus.read",
+    "reports.read",
+    "reports.export",
     "employee.records.read",
     "employee.records.write",
+    "employee.requests.review.read",
+    "employee.requests.review.write",
     "pds.self.read",
     "pds.self.write",
     "pds.review.read",
@@ -110,6 +127,10 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
     "admin.users.read",
     "admin.users.write",
     "admin.organization.read",
+    "admin.campus.users.read",
+    "admin.campus.users.write",
+    "admin.campus.organization.read",
+    "admin.campus.organization.write",
     "recruitment.vacancies.read",
     "recruitment.vacancies.write",
     "recruitment.applicants.read",
@@ -122,8 +143,13 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
     "compliance.indicators.write",
     "compliance.dashboard.read",
     "audit.logs.read",
+    "audit.logs.campus.read",
+    "reports.read",
+    "reports.export",
     "employee.records.read",
     "employee.records.write",
+    "employee.requests.review.read",
+    "employee.requests.review.write",
     "pds.self.read",
     "pds.self.write",
     "pds.review.read",
@@ -166,9 +192,19 @@ const rolePermissionsMap: Record<AppRole, AppPermission[]> = {
     "recruitment.recommendations.write",
     "compliance.evidence.read",
     "compliance.evidence.write",
+    "compliance.review.write",
     "compliance.dashboard.read",
+    "audit.logs.campus.read",
+    "reports.read",
+    "reports.export",
+    "admin.campus.users.read",
+    "admin.campus.users.write",
+    "admin.campus.organization.read",
+    "admin.campus.organization.write",
     "employee.records.read",
     "employee.records.write",
+    "employee.requests.review.read",
+    "employee.requests.review.write",
     "pds.self.read",
     "pds.self.write",
     "pds.review.read",
@@ -261,4 +297,3 @@ export function can(role: AppRole, permission: AppPermission): boolean {
 export function resolvePermissions(roles: AppRole[]): AppPermission[] {
   return [...new Set(roles.flatMap((role) => rolePermissionsMap[role]))];
 }
-

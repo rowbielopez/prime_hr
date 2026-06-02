@@ -7,6 +7,12 @@ import { writeAuditLog } from "@/features/audit/server/write-audit-log";
 
 export type PdsActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
+const PDS_SAVE_ERROR = "We could not save this PDS section right now. Please review the entries and try again.";
+
+function pdsSaveFailure(): PdsActionResult {
+    return { ok: false, error: PDS_SAVE_ERROR };
+}
+
 // â”€â”€ Address helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type AddressInput = {
@@ -110,7 +116,7 @@ export async function updatePersonalInfoAction(input: UpdatePersonalInfoInput): 
         .eq("id", input.personalInfoId)
         .eq("pds_profile_id", input.pdsProfileId);
 
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     await writeAuditLog({ eventType: "pds", action: "update", entityType: "pds_personal_info", entityId: input.employeeId });
     revalidatePath(`/employees/${input.employeeId}/pds`);
@@ -169,7 +175,7 @@ export async function updateFamilyBackgroundAction(input: UpdateFamilyBackground
         .eq("id", input.familyId)
         .eq("pds_profile_id", input.pdsProfileId);
 
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     revalidatePath(`/employees/${input.employeeId}/pds`);
     return { ok: true };
@@ -198,7 +204,7 @@ export async function upsertChildAction(input: UpsertChildInput): Promise<PdsAct
         const { error } = await db.from("employee_children")
             .update({ full_name: input.fullName, birth_date: input.birthDate || null, sort_order: input.sortOrder, updated_by_user_id: context.appUserId })
             .eq("id", input.childId).eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.childId };
@@ -206,7 +212,7 @@ export async function upsertChildAction(input: UpsertChildInput): Promise<PdsAct
         const { data, error } = await db.from("employee_children")
             .insert({ pds_profile_id: input.pdsProfileId, employee_id: input.employeeId, campus_id: input.campusId, full_name: input.fullName, birth_date: input.birthDate || null, sort_order: input.sortOrder, created_by_user_id: context.appUserId, updated_by_user_id: context.appUserId })
             .select("id").single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -222,7 +228,7 @@ export async function deleteChildAction(input: DeleteChildInput): Promise<PdsAct
     const { error } = await db.from("employee_children")
         .update({ deleted_at: new Date().toISOString(), updated_by_user_id: context.appUserId })
         .eq("id", input.childId).eq("pds_profile_id", input.pdsProfileId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     revalidatePath(`/employees/${input.employeeId}/pds`);
     return { ok: true };
@@ -267,7 +273,7 @@ export async function upsertEducationAction(input: UpsertEducationInput): Promis
 
     if (input.educationId) {
         const { error } = await db.from("employee_education").update(payload).eq("id", input.educationId).eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.educationId };
@@ -275,7 +281,7 @@ export async function upsertEducationAction(input: UpsertEducationInput): Promis
         const { data, error } = await db.from("employee_education")
             .insert({ ...payload, pds_profile_id: input.pdsProfileId, employee_id: input.employeeId, campus_id: input.campusId, created_by_user_id: context.appUserId })
             .select("id").single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -318,7 +324,7 @@ export async function upsertEligibilityAction(input: UpsertEligibilityInput): Pr
 
     if (input.eligibilityId) {
         const { error } = await db.from("employee_eligibilities").update(payload).eq("id", input.eligibilityId).eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.eligibilityId };
@@ -326,7 +332,7 @@ export async function upsertEligibilityAction(input: UpsertEligibilityInput): Pr
         const { data, error } = await db.from("employee_eligibilities")
             .insert({ ...payload, pds_profile_id: input.pdsProfileId, employee_id: input.employeeId, campus_id: input.campusId, created_by_user_id: context.appUserId })
             .select("id").single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -342,7 +348,7 @@ export async function deleteEligibilityAction(input: DeleteEligibilityInput): Pr
     const { error } = await db.from("employee_eligibilities")
         .update({ deleted_at: new Date().toISOString(), updated_by_user_id: context.appUserId })
         .eq("id", input.eligibilityId).eq("pds_profile_id", input.pdsProfileId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     revalidatePath(`/employees/${input.employeeId}/pds`);
     return { ok: true };
@@ -390,7 +396,7 @@ export async function upsertWorkExperienceAction(input: UpsertWorkExperienceInpu
 
     if (input.workExpId) {
         const { error } = await db.from("employee_work_experiences").update(payload).eq("id", input.workExpId).eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.workExpId };
@@ -398,7 +404,7 @@ export async function upsertWorkExperienceAction(input: UpsertWorkExperienceInpu
         const { data, error } = await db.from("employee_work_experiences")
             .insert({ ...payload, pds_profile_id: input.pdsProfileId, employee_id: input.employeeId, campus_id: input.campusId, created_by_user_id: context.appUserId })
             .select("id").single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -414,7 +420,7 @@ export async function deleteWorkExperienceAction(input: DeleteWorkExperienceInpu
     const { error } = await db.from("employee_work_experiences")
         .update({ deleted_at: new Date().toISOString(), updated_by_user_id: context.appUserId })
         .eq("id", input.workExpId).eq("pds_profile_id", input.pdsProfileId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     revalidatePath(`/employees/${input.employeeId}/pds`);
     return { ok: true };
@@ -456,7 +462,7 @@ export async function upsertLearningAction(input: UpsertLearningInput): Promise<
 
     if (input.learningId) {
         const { error } = await db.from("employee_learning_development").update(payload).eq("id", input.learningId).eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.learningId };
@@ -464,7 +470,7 @@ export async function upsertLearningAction(input: UpsertLearningInput): Promise<
         const { data, error } = await db.from("employee_learning_development")
             .insert({ ...payload, pds_profile_id: input.pdsProfileId, employee_id: input.employeeId, campus_id: input.campusId, created_by_user_id: context.appUserId })
             .select("id").single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -480,7 +486,7 @@ export async function deleteLearningAction(input: DeleteLearningInput): Promise<
     const { error } = await db.from("employee_learning_development")
         .update({ deleted_at: new Date().toISOString(), updated_by_user_id: context.appUserId })
         .eq("id", input.learningId).eq("pds_profile_id", input.pdsProfileId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     revalidatePath(`/employees/${input.employeeId}/pds`);
     return { ok: true };
@@ -502,7 +508,7 @@ export async function upsertSkillAction(input: UpsertSkillInput): Promise<PdsAct
         const { error } = await db.from("employee_other_skills")
             .update({ skill_name: input.skillName, sort_order: input.sortOrder, updated_by_user_id: context.appUserId })
             .eq("id", input.skillId).eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.skillId };
@@ -510,7 +516,7 @@ export async function upsertSkillAction(input: UpsertSkillInput): Promise<PdsAct
         const { data, error } = await db.from("employee_other_skills")
             .insert({ pds_profile_id: input.pdsProfileId, employee_id: input.employeeId, campus_id: input.campusId, skill_name: input.skillName, sort_order: input.sortOrder, created_by_user_id: context.appUserId, updated_by_user_id: context.appUserId })
             .select("id").single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -525,7 +531,7 @@ export async function deleteSkillAction(input: DeleteSkillInput): Promise<PdsAct
     const { error } = await db.from("employee_other_skills")
         .update({ deleted_at: new Date().toISOString(), updated_by_user_id: context.appUserId })
         .eq("id", input.skillId).eq("pds_profile_id", input.pdsProfileId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     revalidatePath(`/employees/${input.employeeId}/pds`);
     return { ok: true };
@@ -547,7 +553,7 @@ export async function upsertRecognitionAction(input: UpsertRecognitionInput): Pr
         const { error } = await db.from("employee_recognitions")
             .update({ recognition_title: input.recognitionTitle, sort_order: input.sortOrder, updated_by_user_id: context.appUserId })
             .eq("id", input.recognitionId).eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.recognitionId };
@@ -555,7 +561,7 @@ export async function upsertRecognitionAction(input: UpsertRecognitionInput): Pr
         const { data, error } = await db.from("employee_recognitions")
             .insert({ pds_profile_id: input.pdsProfileId, employee_id: input.employeeId, campus_id: input.campusId, recognition_title: input.recognitionTitle, sort_order: input.sortOrder, created_by_user_id: context.appUserId, updated_by_user_id: context.appUserId })
             .select("id").single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -570,7 +576,7 @@ export async function deleteRecognitionAction(input: DeleteRecognitionInput): Pr
     const { error } = await db.from("employee_recognitions")
         .update({ deleted_at: new Date().toISOString(), updated_by_user_id: context.appUserId })
         .eq("id", input.recognitionId).eq("pds_profile_id", input.pdsProfileId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     revalidatePath(`/employees/${input.employeeId}/pds`);
     return { ok: true };
@@ -592,7 +598,7 @@ export async function upsertMembershipAction(input: UpsertMembershipInput): Prom
         const { error } = await db.from("employee_memberships")
             .update({ organization_name: input.organizationName, sort_order: input.sortOrder, updated_by_user_id: context.appUserId })
             .eq("id", input.membershipId).eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.membershipId };
@@ -600,7 +606,7 @@ export async function upsertMembershipAction(input: UpsertMembershipInput): Prom
         const { data, error } = await db.from("employee_memberships")
             .insert({ pds_profile_id: input.pdsProfileId, employee_id: input.employeeId, campus_id: input.campusId, organization_name: input.organizationName, sort_order: input.sortOrder, created_by_user_id: context.appUserId, updated_by_user_id: context.appUserId })
             .select("id").single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -615,7 +621,7 @@ export async function deleteMembershipAction(input: DeleteMembershipInput): Prom
     const { error } = await db.from("employee_memberships")
         .update({ deleted_at: new Date().toISOString(), updated_by_user_id: context.appUserId })
         .eq("id", input.membershipId).eq("pds_profile_id", input.pdsProfileId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     revalidatePath(`/employees/${input.employeeId}/pds`);
     return { ok: true };
@@ -646,7 +652,7 @@ export async function upsertReferenceAction(input: UpsertReferenceInput): Promis
         const { error } = await db.from("employee_references")
             .update({ full_name: input.fullName, address: input.address, telephone_no: input.telephoneNo, email: input.email, sort_order: input.sortOrder, updated_by_user_id: context.appUserId })
             .eq("id", input.referenceId).eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.referenceId };
@@ -654,7 +660,7 @@ export async function upsertReferenceAction(input: UpsertReferenceInput): Promis
         const { data, error } = await db.from("employee_references")
             .insert({ pds_profile_id: input.pdsProfileId, employee_id: input.employeeId, campus_id: input.campusId, full_name: input.fullName, address: input.address, telephone_no: input.telephoneNo, email: input.email, sort_order: input.sortOrder, created_by_user_id: context.appUserId, updated_by_user_id: context.appUserId })
             .select("id").single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -670,7 +676,7 @@ export async function deleteReferenceAction(input: DeleteReferenceInput): Promis
     const { error } = await db.from("employee_references")
         .update({ deleted_at: new Date().toISOString(), updated_by_user_id: context.appUserId })
         .eq("id", input.referenceId).eq("pds_profile_id", input.pdsProfileId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     revalidatePath(`/employees/${input.employeeId}/pds`);
     return { ok: true };
@@ -709,7 +715,7 @@ export async function upsertDeclarationAction(input: UpsertDeclarationInput): Pr
             .update(payload)
             .eq("id", input.declarationId)
             .eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.declarationId };
@@ -725,7 +731,7 @@ export async function upsertDeclarationAction(input: UpsertDeclarationInput): Pr
             })
             .select("id")
             .single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -770,7 +776,7 @@ export async function upsertGovernmentIdAction(input: UpsertGovernmentIdInput): 
             .update(payload)
             .eq("id", input.governmentIdId)
             .eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: input.governmentIdId };
@@ -786,7 +792,7 @@ export async function upsertGovernmentIdAction(input: UpsertGovernmentIdInput): 
             })
             .select("id")
             .single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         revalidatePath(`/employees/${input.employeeId}/pds`);
         return { ok: true, id: (data as { id: string }).id };
@@ -832,7 +838,7 @@ export async function upsertVoluntaryWorkAction(input: UpsertVoluntaryWorkInput)
             .update(payload)
             .eq("id", input.voluntaryWorkId)
             .eq("pds_profile_id", input.pdsProfileId);
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         await writeAuditLog({ eventType: "pds", action: "update", entityType: "pds_voluntary_work", entityId: input.employeeId });
         revalidatePath(`/employees/${input.employeeId}/pds`);
@@ -842,7 +848,7 @@ export async function upsertVoluntaryWorkAction(input: UpsertVoluntaryWorkInput)
             .insert({ ...payload, pds_profile_id: input.pdsProfileId, employee_id: input.employeeId, campus_id: input.campusId, created_by_user_id: context.appUserId })
             .select("id")
             .single();
-        if (error) return { ok: false, error: error.message };
+        if (error) return pdsSaveFailure();
         await touchProfile(db, input.pdsProfileId, context.appUserId);
         await writeAuditLog({ eventType: "pds", action: "create", entityType: "pds_voluntary_work", entityId: input.employeeId });
         revalidatePath(`/employees/${input.employeeId}/pds`);
@@ -860,9 +866,10 @@ export async function deleteVoluntaryWorkAction(input: DeleteVoluntaryWorkInput)
         .update({ deleted_at: new Date().toISOString(), updated_by_user_id: context.appUserId })
         .eq("id", input.voluntaryWorkId)
         .eq("pds_profile_id", input.pdsProfileId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return pdsSaveFailure();
     await touchProfile(db, input.pdsProfileId, context.appUserId);
     await writeAuditLog({ eventType: "pds", action: "delete", entityType: "pds_voluntary_work", entityId: input.employeeId });
     revalidatePath(`/employees/${input.employeeId}/pds`);
     return { ok: true };
 }
+

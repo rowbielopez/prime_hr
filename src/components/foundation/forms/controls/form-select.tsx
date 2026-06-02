@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/select";
 import { FormControl, type FormControlProps } from "./form-control";
 
+const EMPTY_SELECT_VALUE = "__prime_hr_form_select_empty__";
+
 export type FormSelectOption<TValue extends string = string> = {
     value: TValue;
     label: string;
@@ -55,6 +57,8 @@ export function FormSelect<TValue extends string = string>({
     const reactId = useId();
     const fieldId = id ?? reactId;
     const describedBy = hint || error || help ? `${fieldId}-desc` : undefined;
+    const isControlled = value !== undefined || onValueChange !== undefined;
+    const resolvedValue: TValue | undefined = isControlled ? ((value ?? EMPTY_SELECT_VALUE) as TValue) : undefined;
 
     return (
         <FormControl
@@ -69,9 +73,10 @@ export function FormSelect<TValue extends string = string>({
             className={className}
         >
             <Select
-                value={value}
-                defaultValue={defaultValue}
+                value={resolvedValue}
+                defaultValue={isControlled ? undefined : defaultValue}
                 onValueChange={(v) => {
+                    if (v === EMPTY_SELECT_VALUE) return;
                     if (v != null) onValueChange?.(v as TValue);
                 }}
                 name={name}
@@ -86,6 +91,11 @@ export function FormSelect<TValue extends string = string>({
                     <SelectValue placeholder={placeholder} />
                 </SelectTrigger>
                 <SelectContent>
+                    {isControlled && value === undefined ? (
+                        <SelectItem value={EMPTY_SELECT_VALUE} disabled>
+                            {placeholder}
+                        </SelectItem>
+                    ) : null}
                     {options.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
                             <span className="flex flex-col">

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/features/audit/server/write-audit-log";
+import { logServerError } from "@/lib/logging/server-logger";
 import { requirePermission } from "@/features/auth/server/require-permission";
 import { officeBelongsToCampus } from "@/features/admin/organization/repository/scope.repository";
 import { getEmployeeScopeById } from "@/features/employees/repository/employees.repository";
@@ -20,7 +21,7 @@ async function safeAuditLog(input: Parameters<typeof writeAuditLog>[0]) {
     try {
         await writeAuditLog(input);
     } catch (error) {
-        console.error("audit_log_failed", error);
+        logServerError("audit_log_failed", error);
     }
 }
 

@@ -15,6 +15,10 @@ export const vacancyFormSchema = z.object({
   postedAt: z.string().regex(datePattern, "Posted date must be YYYY-MM-DD").nullable().optional(),
   closingAt: z.string().regex(datePattern, "Closing date must be YYYY-MM-DD").nullable().optional(),
   remarks: z.string().trim().max(1000, "Remarks are too long").nullable().optional(),
-});
+  requiredDocuments: z.array(z.string()).default([]),
+}).refine(
+  (input) => !input.postedAt || !input.closingAt || input.closingAt >= input.postedAt,
+  { message: "Application deadline cannot be earlier than the posting date.", path: ["closingAt"] }
+);
 
 export type VacancyFormInput = z.infer<typeof vacancyFormSchema>;

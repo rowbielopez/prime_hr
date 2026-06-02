@@ -1,0 +1,172 @@
+-- 0056_public_careers_foundation.sql
+-- Add public-facing surface for Job Vacancies (Careers page) and outside-applicant submissions.
+-- Non-destructive: adds nullable columns, a sequence, a SECURITY-DEFINER-style projection view, and grants
+-- SELECT on that view to anon. No existing RLS policies are modified; the service-role server action is the
+-- only write path for anonymous applications.
+
+begin;
+
+-- ----------------------------------------------------------------------------
+-- 1. Public slug on vacancies (stable opaque-but-readable identifier for /careers/[slug])
+-- ----------------------------------------------------------------------------
+
+alter table public.recruitment_vacancies
+  add column if not exists public_slug text;
+
+create unique index if not exists idx_recruitment_vacancies_public_slug
+  on public.recruitment_vacancies(public_slug);
+
+create or replace function public.set_recruitment_vacancy_public_slug()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_base text;
+  v_suffix text;
+  v_slug text;
+  v_attempt int := 0;
+begin
+  -- Slug is stable once generated. Skip if caller already set it (e.g. backfill) or it exists from a prior write.
+  if new.public_slug is not null and length(new.public_slug) > 0 then
+    return new;
+  end if;
+
+  v_base := regexp_replace(lower(coalesce(new.title, 'vacancy')), '[^a-z0-9]+', '-', 'g');
+  v_base := regexp_replace(v_base, '(^-+)|(-+$)', '', 'g');
+  if v_base = '' then
+    v_base := 'vacancy';
+  end if;
+  if length(v_base) > 60 then
+    v_base := substring(v_base from 1 for 60);
+    v_base := regexp_replace(v_base, '-+$', '', 'g');
+  end if;
+
+  loop
+    v_attempt := v_attempt + 1;
+    v_suffix := lpad(to_hex((floor(random() * 4294967295))::bigint), 8, '0');
+    v_slug := v_base || '-' || v_suffix;
+    exit when not exists (select 1 from public.recruitment_vacancies where public_slug = v_slug);
+    if v_attempt >= 6 then
+      raise exception 'failed to generate unique vacancy public_slug after % attempts', v_attempt;
+    end if;
+  end loop;
+
+  new.public_slug := v_slug;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_recruitment_vacancies_set_public_slug on public.recruitment_vacancies;
+create trigger trg_recruitment_vacancies_set_public_slug
+before insert on public.recruitment_vacancies
+for each row execute function public.set_recruitment_vacancy_public_slug();
+
+-- Backfill existing rows (NULL slug => trigger-equivalent generation via a one-time update)
+do $$
+declare
+  r record;
+  v_base text;
+  v_suffix text;
+  v_slug text;
+  v_attempt int;
+begin
+  for r in select id, title from public.recruitment_vacancies where public_slug is null loop
+    v_base := regexp_replace(lower(coalesce(r.title, 'vacancy')), '[^a-z0-9]+', '-', 'g');
+    v_base := regexp_replace(v_base, '(^-+)|(-+$)', '', 'g');
+    if v_base = '' then v_base := 'vacancy'; end if;
+    if length(v_base) > 60 then
+      v_base := regexp_replace(substring(v_base from 1 for 60), '-+$', '', 'g');
+    end if;
+    v_attempt := 0;
+    loop
+      v_attempt := v_attempt + 1;
+      v_suffix := lpad(to_hex((floor(random() * 4294967295))::bigint), 8, '0');
+      v_slug := v_base || '-' || v_suffix;
+      exit when not exists (select 1 from public.recruitment_vacancies where public_slug = v_slug);
+      if v_attempt >= 6 then
+        raise exception 'failed to backfill vacancy slug for %', r.id;
+      end if;
+    end loop;
+    update public.recruitment_vacancies set public_slug = v_slug where id = r.id;
+  end loop;
+end $$;
+
+-- ----------------------------------------------------------------------------
+-- 2. Applicant source (marks records originating from the public careers page)
+-- ----------------------------------------------------------------------------
+
+alter table public.recruitment_applicants
+  add column if not exists source text;
+
+create index if not exists idx_recruitment_applicants_source
+  on public.recruitment_applicants(source)
+  where source is not null;
+
+comment on column public.recruitment_applicants.source is
+  'Free-text origin marker (e.g. "public_careers"). Used to badge applicants from outside submissions.';
+
+-- ----------------------------------------------------------------------------
+-- 3. Application reference number (human-shareable tracking code on outside submissions)
+-- ----------------------------------------------------------------------------
+
+create sequence if not exists public.recruitment_application_reference_seq
+  start with 1
+  increment by 1
+  no minvalue
+  no maxvalue
+  cache 1;
+
+alter table public.recruitment_applications
+  add column if not exists reference_no text;
+
+create unique index if not exists idx_recruitment_applications_reference_no
+  on public.recruitment_applications(reference_no)
+  where reference_no is not null;
+
+comment on column public.recruitment_applications.reference_no is
+  'Public-facing application reference (e.g. APP-2026-000001). Generated by the public submission action; null for HR-created applications.';
+
+-- ----------------------------------------------------------------------------
+-- 4. Public projection view (the ONLY surface anon role can read)
+-- ----------------------------------------------------------------------------
+-- Intentional design:
+--   * The view uses security_invoker = false so it executes as its owner (postgres)
+--     and bypasses RLS on the underlying base table. This is REQUIRED because we
+--     do NOT want to grant anon role any privilege on `recruitment_vacancies` itself.
+--   * The WHERE clause is the only filter: only `status = 'open'`, non-deleted, and
+--     non-expired rows are visible. Internal fields (`remarks`, `id`, etc.) are
+--     intentionally OMITTED from the column list, so leakage is structurally impossible.
+--   * No anon write policy is added anywhere. Public submissions go through a
+--     service-role server action which validates state in-DB before insert.
+
+drop view if exists public.public_vacancies;
+create view public.public_vacancies
+with (security_invoker = false)
+as
+select
+  v.public_slug,
+  v.title,
+  v.description,
+  v.qualification_notes,
+  v.plantilla_item_no,
+  v.employment_type,
+  v.item_count,
+  v.posted_at,
+  v.closing_at,
+  v.updated_at,
+  c.name as campus_name,
+  o.name as office_name
+from public.recruitment_vacancies v
+join public.campuses c on c.id = v.campus_id
+left join public.offices o on o.id = v.office_id
+where v.status = 'open'
+  and v.deleted_at is null
+  and (v.closing_at is null or v.closing_at >= current_date)
+  and v.public_slug is not null;
+
+comment on view public.public_vacancies is
+  'Anon-readable projection of currently-open vacancies for the public /careers page. Runs as view owner to bypass base-table RLS; no internal-only columns are exposed.';
+
+grant select on public.public_vacancies to anon, authenticated;
+
+commit;

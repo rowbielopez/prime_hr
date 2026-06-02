@@ -16,7 +16,10 @@ import {
   AdminDataTable,
   AdminStatusChip,
 } from "@/components/foundation/data/admin-data-table";
-import { createAdminColumns, createRowActions } from "@/components/foundation/data/admin-data-table.helpers";
+import {
+  createAdminColumns,
+  createRowActions,
+} from "@/components/foundation/data/admin-data-table.helpers";
 import { useAdminTableState } from "@/components/foundation/data/use-admin-table-state";
 import {
   ClearFiltersButton,
@@ -26,6 +29,7 @@ import {
 } from "@/components/foundation/data/filter-controls";
 import type {
   CampusOption,
+  EmployeeEmailAssignmentSearchResult,
   EmployeeSearchResult,
   OfficeOption,
   RoleOption,
@@ -38,8 +42,10 @@ import {
   updateUserManagementAction,
   relinkEmployeeAction,
   searchEmployeesAction,
+  searchEmployeesForEmailAssignmentAction,
   manualProvisionUserAction,
 } from "@/features/admin/users/actions";
+import { assignEmployeeLoginEmailAction } from "@/features/employees/actions";
 
 type UserTableProps = {
   users: UserListItem[];
@@ -47,6 +53,8 @@ type UserTableProps = {
   campuses: CampusOption[];
   offices: OfficeOption[];
   actorIsSuperAdmin: boolean;
+  canProvisionAccounts: boolean;
+  canAssignEmployeeEmail: boolean;
 };
 
 const columns = createAdminColumns<UserListItem>([
@@ -75,8 +83,20 @@ const columns = createAdminColumns<UserListItem>([
     header: "Status",
     cell: (row) => (
       <AdminStatusChip
-        tone={row.isActive ? "active" : row.status === "suspended" ? "warning" : "inactive"}
-        label={row.isActive ? "Active" : row.status === "suspended" ? "Suspended" : "Inactive"}
+        tone={
+          row.isActive
+            ? "active"
+            : row.status === "suspended"
+              ? "warning"
+              : "inactive"
+        }
+        label={
+          row.isActive
+            ? "Active"
+            : row.status === "suspended"
+              ? "Suspended"
+              : "Inactive"
+        }
       />
     ),
   },
@@ -90,18 +110,42 @@ type UserFormState = {
   isActive: boolean;
 };
 
-export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }: UserTableProps) {
+export function UserTable({
+  users,
+  roles,
+  campuses,
+  offices,
+  actorIsSuperAdmin,
+  canProvisionAccounts,
+  canAssignEmployeeEmail,
+}: UserTableProps) {
   const [isPending, startTransition] = useTransition();
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [formState, setFormState] = useState<UserFormState | null>(null);
   const [relinkingUserId, setRelinkingUserId] = useState<string | null>(null);
   const [relinkQuery, setRelinkQuery] = useState("");
-  const [relinkResults, setRelinkResults] = useState<EmployeeSearchResult[]>([]);
-  const [relinkSelectedId, setRelinkSelectedId] = useState<string | null | undefined>(undefined);
+  const [relinkResults, setRelinkResults] = useState<EmployeeSearchResult[]>(
+    [],
+  );
+  const [relinkSelectedId, setRelinkSelectedId] = useState<
+    string | null | undefined
+  >(undefined);
   const [showProvisionDialog, setShowProvisionDialog] = useState(false);
   const [provisionEmail, setProvisionEmail] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [showEmailAssignmentDialog, setShowEmailAssignmentDialog] =
+    useState(false);
+  const [emailAssignmentQuery, setEmailAssignmentQuery] = useState("");
+  const [emailAssignmentResults, setEmailAssignmentResults] = useState<
+    EmployeeEmailAssignmentSearchResult[]
+  >([]);
+  const [emailAssignmentSelectedId, setEmailAssignmentSelectedId] = useState<
+    string | null
+  >(null);
+  const [emailAssignmentEmail, setEmailAssignmentEmail] = useState("");
+  const [isEmailAssignmentSearching, setIsEmailAssignmentSearching] =
+    useState(false);
 
   const tableState = useAdminTableState<UserListItem>({
     rows: users,
@@ -136,40 +180,52 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
         { key: "view", label: "View Details" },
         ...(canMutate
           ? [
-            { key: "edit", label: "Assign Role/Campus/Office" },
-            { key: "relink-employee", label: "Change Employee Link" },
-            {
-              key: "toggle-access",
-              label: row.isActive ? "Deactivate Access" : "Activate Access",
-              destructive: row.isActive,
-            },
-          ]
+              { key: "edit", label: "Assign Role/Campus/Office" },
+              { key: "relink-employee", label: "Change Employee Link" },
+              {
+                key: "toggle-access",
+                label: row.isActive ? "Deactivate Access" : "Activate Access",
+                destructive: row.isActive,
+              },
+            ]
           : []),
       ];
-    }
+    },
   );
 
   const roleOptions: FilterOption[] = useMemo(
-    () => [{ label: "All Roles", value: "all" }, ...roles.map((role) => ({ label: role.name, value: role.id }))],
-    [roles]
+    () => [
+      { label: "All Roles", value: "all" },
+      ...roles.map((role) => ({ label: role.name, value: role.id })),
+    ],
+    [roles],
   );
   const campusOptions: FilterOption[] = useMemo(
     () => [
       { label: "All Campuses", value: "all" },
-      ...campuses.map((campus) => ({ label: `${campus.code} - ${campus.name}`, value: campus.id })),
+      ...campuses.map((campus) => ({
+        label: `${campus.code} - ${campus.name}`,
+        value: campus.id,
+      })),
     ],
-    [campuses]
+    [campuses],
   );
 
   const viewingUser = users.find((user) => user.id === viewingUserId) ?? null;
   const editingUser = users.find((user) => user.id === editingUserId) ?? null;
-  const relinkingUser = users.find((user) => user.id === relinkingUserId) ?? null;
-  const selectedRole = roles.find((role) => role.id === (formState?.roleId ?? "")) ?? null;
+  const relinkingUser =
+    users.find((user) => user.id === relinkingUserId) ?? null;
+  const selectedRole =
+    roles.find((role) => role.id === (formState?.roleId ?? "")) ?? null;
   const requiresCampus = selectedRole?.scopeType === "scoped";
   const officeOptions = offices.filter((office) => {
     if (!formState?.campusId) return false;
     return office.campusId === formState.campusId;
   });
+  const selectedEmailAssignmentEmployee =
+    emailAssignmentResults.find(
+      (employee) => employee.id === emailAssignmentSelectedId,
+    ) ?? null;
 
   function openEdit(userId: string) {
     const user = users.find((item) => item.id === userId);
@@ -205,12 +261,19 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
   function submitRelink() {
     if (!relinkingUserId || relinkSelectedId === undefined) return;
     startTransition(async () => {
-      const result = await relinkEmployeeAction(relinkingUserId, relinkSelectedId);
+      const result = await relinkEmployeeAction(
+        relinkingUserId,
+        relinkSelectedId,
+      );
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
-      toast.success(relinkSelectedId ? "Employee linked successfully" : "Employee link removed");
+      toast.success(
+        relinkSelectedId
+          ? "Employee linked successfully"
+          : "Employee link removed",
+      );
       setRelinkingUserId(null);
     });
   }
@@ -222,9 +285,69 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
         toast.error(result.error, { duration: 8000 });
         return;
       }
-      toast.success("Account provisioned. Find it in the table below and assign a role to activate it.");
+      toast.success(
+        "Account provisioned. Find it in the table below and assign a role to activate it.",
+      );
       setShowProvisionDialog(false);
       setProvisionEmail("");
+    });
+  }
+
+  function resetEmailAssignmentDialog() {
+    setShowEmailAssignmentDialog(false);
+    setEmailAssignmentQuery("");
+    setEmailAssignmentResults([]);
+    setEmailAssignmentSelectedId(null);
+    setEmailAssignmentEmail("");
+  }
+
+  async function handleEmailAssignmentSearch() {
+    if (!emailAssignmentQuery.trim()) return;
+    setIsEmailAssignmentSearching(true);
+    try {
+      const results =
+        await searchEmployeesForEmailAssignmentAction(emailAssignmentQuery);
+      setEmailAssignmentResults(results);
+      setEmailAssignmentSelectedId(null);
+      setEmailAssignmentEmail("");
+    } finally {
+      setIsEmailAssignmentSearching(false);
+    }
+  }
+
+  function selectEmployeeForEmailAssignment(
+    employee: EmployeeEmailAssignmentSearchResult,
+  ) {
+    setEmailAssignmentSelectedId(employee.id);
+    setEmailAssignmentEmail(employee.email ?? "");
+  }
+
+  function submitEmailAssignment() {
+    if (!selectedEmailAssignmentEmployee || !emailAssignmentEmail.trim())
+      return;
+    startTransition(async () => {
+      const result = await assignEmployeeLoginEmailAction({
+        employeeId: selectedEmailAssignmentEmployee.id,
+        email: emailAssignmentEmail,
+      });
+      if (!result.ok) {
+        toast.error(result.error, { duration: 8000 });
+        return;
+      }
+      if (result.linkedExistingAccount) {
+        toast.success(
+          result.accountIsActive
+            ? "CSU email assigned and an active sign-in account was linked."
+            : "CSU email assigned and the existing sign-in account was linked. Assign a role and activate access if needed.",
+          { duration: 8000 },
+        );
+      } else {
+        toast.success(
+          "CSU email assigned. Ask the employee to sign in once with their CSU Google account, then activate/link access from Users.",
+          { duration: 9000 },
+        );
+      }
+      resetEmailAssignmentDialog();
     });
   }
 
@@ -251,7 +374,9 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
           toast.error(result.error);
           return;
         }
-        toast.success(user.isActive ? "User access deactivated" : "User access activated");
+        toast.success(
+          user.isActive ? "User access deactivated" : "User access activated",
+        );
       });
     }
   }
@@ -285,10 +410,36 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
       title="Users"
       description="Manage user access, role scope, and organizational assignments."
       actions={
-        actorIsSuperAdmin ? (
-          <Button size="sm" variant="outline" onClick={() => { setProvisionEmail(""); setShowProvisionDialog(true); }}>
-            Provision Account
-          </Button>
+        canProvisionAccounts || canAssignEmployeeEmail ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {canAssignEmployeeEmail ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEmailAssignmentQuery("");
+                  setEmailAssignmentResults([]);
+                  setEmailAssignmentSelectedId(null);
+                  setEmailAssignmentEmail("");
+                  setShowEmailAssignmentDialog(true);
+                }}
+              >
+                Assign Employee Email
+              </Button>
+            ) : null}
+            {canProvisionAccounts ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setProvisionEmail("");
+                  setShowProvisionDialog(true);
+                }}
+              >
+                Provision Account
+              </Button>
+            ) : null}
+          </div>
         ) : undefined
       }
     >
@@ -312,7 +463,13 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
               options={campusOptions}
             />
             <StatusFilterControls
-              value={(tableState.filters.status as "all" | "active" | "inactive" | undefined) ?? "all"}
+              value={
+                (tableState.filters.status as
+                  | "all"
+                  | "active"
+                  | "inactive"
+                  | undefined) ?? "all"
+              }
               onChange={(value) => tableState.setFilter("status", value)}
             />
             <ClearFiltersButton onClear={tableState.clearFilters} />
@@ -327,44 +484,80 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
         canNextPage={tableState.hasNextPage}
       />
 
-      <Dialog open={!!viewingUser} onOpenChange={(open) => !open && setViewingUserId(null)}>
+      <Dialog
+        open={!!viewingUser}
+        onOpenChange={(open) => !open && setViewingUserId(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>User Details</DialogTitle>
-            <DialogDescription>View assigned access and scope details.</DialogDescription>
+            <DialogDescription>
+              View assigned access and scope details.
+            </DialogDescription>
           </DialogHeader>
           {viewingUser ? (
             <div className="space-y-2 text-sm">
-              <p><span className="font-medium">Name:</span> {viewingUser.fullName}</p>
-              <p><span className="font-medium">Email:</span> {viewingUser.email}</p>
-              <p><span className="font-medium">Role:</span> {viewingUser.roleName ?? "Unassigned"}</p>
-              <p><span className="font-medium">Campus:</span> {viewingUser.campusName ?? "-"}</p>
-              <p><span className="font-medium">Office:</span> {viewingUser.officeName ?? "-"}</p>
-              <p><span className="font-medium">Status:</span> {viewingUser.isActive ? "Active" : "Inactive"}</p>
-              <p><span className="font-medium">Last login:</span> {viewingUser.lastLoginAt ?? "Never"}</p>
+              <p>
+                <span className="font-medium">Name:</span>{" "}
+                {viewingUser.fullName}
+              </p>
+              <p>
+                <span className="font-medium">Email:</span> {viewingUser.email}
+              </p>
+              <p>
+                <span className="font-medium">Role:</span>{" "}
+                {viewingUser.roleName ?? "Unassigned"}
+              </p>
+              <p>
+                <span className="font-medium">Campus:</span>{" "}
+                {viewingUser.campusName ?? "-"}
+              </p>
+              <p>
+                <span className="font-medium">Office:</span>{" "}
+                {viewingUser.officeName ?? "-"}
+              </p>
+              <p>
+                <span className="font-medium">Status:</span>{" "}
+                {viewingUser.isActive ? "Active" : "Inactive"}
+              </p>
+              <p>
+                <span className="font-medium">Last login:</span>{" "}
+                {viewingUser.lastLoginAt ?? "Never"}
+              </p>
               <p>
                 <span className="font-medium">Linked employee:</span>{" "}
-                {viewingUser.employeeNo
-                  ? `${viewingUser.employeeNo} — ${viewingUser.employeeName ?? ""}`
-                  : <span className="text-muted-foreground">Not linked</span>}
+                {viewingUser.employeeNo ? (
+                  `${viewingUser.employeeNo} — ${viewingUser.employeeName ?? ""}`
+                ) : (
+                  <span className="text-muted-foreground">Not linked</span>
+                )}
               </p>
             </div>
           ) : null}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setViewingUserId(null)}>Close</Button>
+            <Button variant="outline" onClick={() => setViewingUserId(null)}>
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUserId(null)}>
+      <Dialog
+        open={!!editingUser}
+        onOpenChange={(open) => !open && setEditingUserId(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Assign User Access</DialogTitle>
-            <DialogDescription>Assign role, campus, office, and activation status.</DialogDescription>
+            <DialogDescription>
+              Assign role, campus, office, and activation status.
+            </DialogDescription>
           </DialogHeader>
           {editingUser && formState ? (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{editingUser.fullName} ({editingUser.email})</p>
+              <p className="text-sm text-muted-foreground">
+                {editingUser.fullName} ({editingUser.email})
+              </p>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Role</label>
                 <select
@@ -374,12 +567,12 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                     setFormState((prev) =>
                       prev
                         ? {
-                          ...prev,
-                          roleId: event.target.value,
-                          campusId: null,
-                          officeId: null,
-                        }
-                        : prev
+                            ...prev,
+                            roleId: event.target.value,
+                            campusId: null,
+                            officeId: null,
+                          }
+                        : prev,
                     )
                   }
                 >
@@ -400,11 +593,11 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                       setFormState((prev) =>
                         prev
                           ? {
-                            ...prev,
-                            campusId: event.target.value || null,
-                            officeId: null,
-                          }
-                          : prev
+                              ...prev,
+                              campusId: event.target.value || null,
+                              officeId: null,
+                            }
+                          : prev,
                       )
                     }
                   >
@@ -427,10 +620,10 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                       setFormState((prev) =>
                         prev
                           ? {
-                            ...prev,
-                            officeId: event.target.value || null,
-                          }
-                          : prev
+                              ...prev,
+                              officeId: event.target.value || null,
+                            }
+                          : prev,
                       )
                     }
                   >
@@ -451,10 +644,10 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                     setFormState((prev) =>
                       prev
                         ? {
-                          ...prev,
-                          isActive: event.target.checked,
-                        }
-                        : prev
+                            ...prev,
+                            isActive: event.target.checked,
+                          }
+                        : prev,
                     )
                   }
                 />
@@ -463,17 +656,33 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
             </div>
           ) : null}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingUserId(null)} disabled={isPending}>Cancel</Button>
-            <Button onClick={submitUserAssignment} disabled={isPending}>Save Assignment</Button>
+            <Button
+              variant="outline"
+              onClick={() => setEditingUserId(null)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button onClick={submitUserAssignment} disabled={isPending}>
+              Save Assignment
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!relinkingUser} onOpenChange={(open) => { if (!open) setRelinkingUserId(null); }}>
+      <Dialog
+        open={!!relinkingUser}
+        onOpenChange={(open) => {
+          if (!open) setRelinkingUserId(null);
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Change Employee Link</DialogTitle>
-            <DialogDescription>Link this user account to an employee record, or remove the existing link.</DialogDescription>
+            <DialogDescription>
+              Link this user account to an employee record, or remove the
+              existing link.
+            </DialogDescription>
           </DialogHeader>
           {relinkingUser ? (
             <div className="space-y-4">
@@ -482,9 +691,11 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
               </p>
               <p className="text-sm">
                 <span className="font-medium">Current link: </span>
-                {relinkingUser.employeeNo
-                  ? `${relinkingUser.employeeNo} — ${relinkingUser.employeeName ?? ""}`
-                  : <span className="text-muted-foreground">Not linked</span>}
+                {relinkingUser.employeeNo ? (
+                  `${relinkingUser.employeeNo} — ${relinkingUser.employeeName ?? ""}`
+                ) : (
+                  <span className="text-muted-foreground">Not linked</span>
+                )}
               </p>
               <div className="flex gap-2">
                 <input
@@ -492,7 +703,9 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                   placeholder="Search by name, email, or employee no."
                   value={relinkQuery}
                   onChange={(e) => setRelinkQuery(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleRelinkSearch(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleRelinkSearch();
+                  }}
                 />
                 <Button
                   variant="outline"
@@ -508,13 +721,27 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                     <button
                       key={emp.id}
                       type="button"
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${relinkSelectedId === emp.id ? "bg-muted font-medium" : ""
-                        }`}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${
+                        relinkSelectedId === emp.id
+                          ? "bg-muted font-medium"
+                          : ""
+                      }`}
                       onClick={() => setRelinkSelectedId(emp.id)}
                     >
-                      <span className="font-medium">{emp.employeeNo}</span> — {emp.fullName}
-                      {emp.email ? <span className="text-muted-foreground"> · {emp.email}</span> : null}
-                      {emp.campusName ? <span className="text-muted-foreground"> · {emp.campusName}</span> : null}
+                      <span className="font-medium">{emp.employeeNo}</span> —{" "}
+                      {emp.fullName}
+                      {emp.email ? (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {emp.email}
+                        </span>
+                      ) : null}
+                      {emp.campusName ? (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {emp.campusName}
+                        </span>
+                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -527,46 +754,221 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
                   onClick={() => setRelinkSelectedId(null)}
                   disabled={relinkSelectedId === null}
                 >
-                  {relinkSelectedId === null ? "Will remove link on save" : "Remove employee link"}
+                  {relinkSelectedId === null
+                    ? "Will remove link on save"
+                    : "Remove employee link"}
                 </Button>
               ) : null}
             </div>
           ) : null}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRelinkingUserId(null)} disabled={isPending}>Cancel</Button>
-            <Button onClick={submitRelink} disabled={isPending || relinkSelectedId === undefined}>Save</Button>
+            <Button
+              variant="outline"
+              onClick={() => setRelinkingUserId(null)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitRelink}
+              disabled={isPending || relinkSelectedId === undefined}
+            >
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showProvisionDialog} onOpenChange={(open) => { if (!open) setShowProvisionDialog(false); }}>
+      <Dialog
+        open={showEmailAssignmentDialog}
+        onOpenChange={(open) => {
+          if (!open) resetEmailAssignmentDialog();
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Assign Employee Email</DialogTitle>
+            <DialogDescription>
+              Search an employee, assign a CSU email, and link an existing
+              sign-in account when one is found.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <input
+                className="h-9 flex-1 rounded-md border bg-background px-3 text-sm"
+                placeholder="Search by employee no. or name"
+                value={emailAssignmentQuery}
+                onChange={(event) =>
+                  setEmailAssignmentQuery(event.target.value)
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") handleEmailAssignmentSearch();
+                }}
+              />
+              <Button
+                variant="outline"
+                onClick={handleEmailAssignmentSearch}
+                disabled={
+                  isEmailAssignmentSearching || !emailAssignmentQuery.trim()
+                }
+              >
+                {isEmailAssignmentSearching ? "Searching..." : "Search"}
+              </Button>
+            </div>
+
+            {emailAssignmentResults.length > 0 ? (
+              <div className="max-h-56 divide-y overflow-y-auto rounded-md border">
+                {emailAssignmentResults.map((employee) => (
+                  <button
+                    key={employee.id}
+                    type="button"
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted ${
+                      emailAssignmentSelectedId === employee.id
+                        ? "bg-muted font-medium"
+                        : ""
+                    }`}
+                    onClick={() => selectEmployeeForEmailAssignment(employee)}
+                  >
+                    <span className="font-medium">{employee.employeeNo}</span> —{" "}
+                    {employee.fullName}
+                    <span className="block text-xs text-muted-foreground">
+                      {employee.campusName ?? "No campus"}
+                      {employee.officeName ? ` · ${employee.officeName}` : ""}
+                      {employee.email
+                        ? ` · Current email: ${employee.email}`
+                        : " · No email assigned"}
+                    </span>
+                    {employee.linkedAccountEmail ? (
+                      <span className="block text-xs text-muted-foreground">
+                        Linked account: {employee.linkedAccountEmail} (
+                        {employee.linkedAccountStatus ?? "unknown"})
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : emailAssignmentQuery.trim().length >= 2 &&
+              !isEmailAssignmentSearching ? (
+              <p className="rounded-md border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
+                No matching employees found.
+              </p>
+            ) : null}
+
+            {selectedEmailAssignmentEmployee ? (
+              <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                <div>
+                  <p className="text-sm font-medium">
+                    {selectedEmailAssignmentEmployee.employeeNo} —{" "}
+                    {selectedEmailAssignmentEmployee.fullName}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedEmailAssignmentEmployee.campusName ?? "No campus"}
+                    {selectedEmailAssignmentEmployee.officeName
+                      ? ` · ${selectedEmailAssignmentEmployee.officeName}`
+                      : ""}
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">CSU login email</label>
+                  <input
+                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    type="email"
+                    placeholder="employee@csu.edu.ph"
+                    value={emailAssignmentEmail}
+                    onChange={(event) =>
+                      setEmailAssignmentEmail(event.target.value)
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !isPending)
+                        submitEmailAssignment();
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Only @csu.edu.ph email addresses are accepted. If no sign-in
+                    account exists yet, the employee must sign in once with CSU
+                    Google.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={isPending}
+              onClick={resetEmailAssignmentDialog}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                isPending ||
+                !selectedEmailAssignmentEmployee ||
+                !emailAssignmentEmail.trim()
+              }
+              onClick={submitEmailAssignment}
+            >
+              {isPending ? "Saving..." : "Assign Email"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showProvisionDialog}
+        onOpenChange={(open) => {
+          if (!open) setShowProvisionDialog(false);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Provision Account</DialogTitle>
             <DialogDescription>
-              Manually create a system account for someone whose automatic provisioning failed or who needs to be set up before their first sign-in.
+              Manually create a system account for someone whose automatic
+              provisioning failed or who needs to be set up before their first
+              sign-in.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100 space-y-1">
               <p className="font-medium">Requirement</p>
-              <p>The person must have attempted to sign in with Google at least once — even if they saw an error. That registers their Google account. If they have never done so, ask them to click &quot;Continue with CSU Google Account&quot; on the login page, then come back here.</p>
+              <p>
+                The person must have attempted to sign in with Google at least
+                once — even if they saw an error. That registers their Google
+                account. If they have never done so, ask them to click
+                &quot;Continue with CSU Google Account&quot; on the login page,
+                then come back here.
+              </p>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Google sign-in email</label>
+              <label className="text-sm font-medium">
+                Google sign-in email
+              </label>
               <input
                 className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                 type="email"
                 placeholder="employee@csu.edu.ph"
                 value={provisionEmail}
                 onChange={(e) => setProvisionEmail(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !isPending) handleProvision(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isPending) handleProvision();
+                }}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" disabled={isPending} onClick={() => setShowProvisionDialog(false)}>Cancel</Button>
-            <Button disabled={isPending || !provisionEmail.trim()} onClick={handleProvision}>
+            <Button
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setShowProvisionDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={isPending || !provisionEmail.trim()}
+              onClick={handleProvision}
+            >
               {isPending ? "Provisioning…" : "Provision Account"}
             </Button>
           </DialogFooter>
@@ -575,4 +977,3 @@ export function UserTable({ users, roles, campuses, offices, actorIsSuperAdmin }
     </DataTableWrapper>
   );
 }
-

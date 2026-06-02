@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useMotionPreference } from "@/app/login/hooks/use-motion-preference";
@@ -60,6 +61,13 @@ export function LandingNav() {
                             {label}
                         </a>
                     ))}
+                    <Link
+                        href="/careers"
+                        className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-surface-raised transition-all duration-150 flex items-center gap-1.5"
+                    >
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        Careers
+                    </Link>
                 </nav>
 
                 {/* CTA */}

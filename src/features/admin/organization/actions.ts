@@ -2,8 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/features/audit/server/write-audit-log";
-import { campusFormSchema, type CampusFormInput } from "@/features/admin/organization/schemas/campus-form.schema";
-import { officeFormSchema, type OfficeFormInput } from "@/features/admin/organization/schemas/office-form.schema";
+import { logServerError } from "@/lib/logging/server-logger";
+import {
+  campusFormSchema,
+  type CampusFormInput,
+} from "@/features/admin/organization/schemas/campus-form.schema";
+import {
+  officeFormSchema,
+  type OfficeFormInput,
+} from "@/features/admin/organization/schemas/office-form.schema";
 import {
   createCampus,
   getCampusSnapshot,
@@ -17,7 +24,11 @@ import {
   updateOffice,
 } from "@/features/admin/organization/repository/office.repository";
 import { getCampusIdByOfficeId } from "@/features/admin/organization/repository/scope.repository";
+import { buildForbiddenUrl } from "@/features/auth/auth-errors";
+import { requireAuthorizedUser } from "@/features/auth/server/require-authorized-user";
 import { requirePermission } from "@/features/auth/server/require-permission";
+import { canAccessCampus, hasPermission } from "@/lib/rbac/scopes";
+import { redirect } from "next/navigation";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -29,10 +40,34 @@ function failure(message: string): ActionResult {
   return { ok: false, error: message };
 }
 
-export async function createCampusAction(input: CampusFormInput): Promise<ActionResult> {
+async function requireOfficeOrganizationWritePermission(
+  campusId?: string | null,
+) {
+  const context = await requireAuthorizedUser();
+  const canWriteGlobalOrganization = hasPermission(
+    context,
+    "admin.organization.write",
+  );
+  const canWriteCampusOrganization = hasPermission(
+    context,
+    "admin.campus.organization.write",
+  );
+  if (!canWriteGlobalOrganization && !canWriteCampusOrganization) {
+    redirect(buildForbiddenUrl("missing_permission"));
+  }
+  if (!canAccessCampus(context, campusId)) {
+    redirect(buildForbiddenUrl("campus_scope_denied"));
+  }
+  return context;
+}
+
+export async function createCampusAction(
+  input: CampusFormInput,
+): Promise<ActionResult> {
   await requirePermission({ permission: "admin.organization.write" });
   const parsed = campusFormSchema.safeParse(input);
-  if (!parsed.success) return failure(parsed.error.issues[0]?.message ?? "Invalid campus input");
+  if (!parsed.success)
+    return failure(parsed.error.issues[0]?.message ?? "Invalid campus input");
   const result = await createCampus(parsed.data);
   if (!result.ok) return failure(result.error ?? "Failed to create campus");
   if (result.campusId) {
@@ -45,17 +80,21 @@ export async function createCampusAction(input: CampusFormInput): Promise<Action
         metadata: { input: parsed.data },
       });
     } catch (e) {
-      console.error("audit_log_failed", e);
+      logServerError("audit_log_failed", e);
     }
   }
   revalidatePath("/admin/campuses");
   return success();
 }
 
-export async function updateCampusAction(campusId: string, input: CampusFormInput): Promise<ActionResult> {
+export async function updateCampusAction(
+  campusId: string,
+  input: CampusFormInput,
+): Promise<ActionResult> {
   await requirePermission({ permission: "admin.organization.write", campusId });
   const parsed = campusFormSchema.safeParse(input);
-  if (!parsed.success) return failure(parsed.error.issues[0]?.message ?? "Invalid campus input");
+  if (!parsed.success)
+    return failure(parsed.error.issues[0]?.message ?? "Invalid campus input");
   const before = await getCampusSnapshot(campusId);
   const result = await updateCampus(campusId, parsed.data);
   if (!result.ok) return failure(result.error ?? "Failed to update campus");
@@ -68,17 +107,21 @@ export async function updateCampusAction(campusId: string, input: CampusFormInpu
       metadata: { before, after: parsed.data },
     });
   } catch (e) {
-    console.error("audit_log_failed", e);
+    logServerError("audit_log_failed", e);
   }
   revalidatePath("/admin/campuses");
   return success();
 }
 
-export async function toggleCampusStatusAction(campusId: string, isActive: boolean): Promise<ActionResult> {
+export async function toggleCampusStatusAction(
+  campusId: string,
+  isActive: boolean,
+): Promise<ActionResult> {
   await requirePermission({ permission: "admin.organization.write", campusId });
   const before = await getCampusSnapshot(campusId);
   const result = await setCampusActive(campusId, isActive);
-  if (!result.ok) return failure(result.error ?? "Failed to update campus status");
+  if (!result.ok)
+    return failure(result.error ?? "Failed to update campus status");
   try {
     await writeAuditLog({
       eventType: "admin.campus_status_toggled",
@@ -88,16 +131,19 @@ export async function toggleCampusStatusAction(campusId: string, isActive: boole
       metadata: { before, isActive, previousIsActive: before?.isActive },
     });
   } catch (e) {
-    console.error("audit_log_failed", e);
+    logServerError("audit_log_failed", e);
   }
   revalidatePath("/admin/campuses");
   return success();
 }
 
-export async function createOfficeAction(input: OfficeFormInput): Promise<ActionResult> {
-  await requirePermission({ permission: "admin.organization.write", campusId: input.campusId });
+export async function createOfficeAction(
+  input: OfficeFormInput,
+): Promise<ActionResult> {
+  await requireOfficeOrganizationWritePermission(input.campusId);
   const parsed = officeFormSchema.safeParse(input);
-  if (!parsed.success) return failure(parsed.error.issues[0]?.message ?? "Invalid office input");
+  if (!parsed.success)
+    return failure(parsed.error.issues[0]?.message ?? "Invalid office input");
   const result = await createOffice(parsed.data);
   if (!result.ok) return failure(result.error ?? "Failed to create office");
   if (result.officeId) {
@@ -111,21 +157,25 @@ export async function createOfficeAction(input: OfficeFormInput): Promise<Action
         metadata: { input: parsed.data },
       });
     } catch (e) {
-      console.error("audit_log_failed", e);
+      logServerError("audit_log_failed", e);
     }
   }
   revalidatePath("/admin/offices");
   return success();
 }
 
-export async function updateOfficeAction(officeId: string, input: OfficeFormInput): Promise<ActionResult> {
+export async function updateOfficeAction(
+  officeId: string,
+  input: OfficeFormInput,
+): Promise<ActionResult> {
   const currentCampusId = await getCampusIdByOfficeId(officeId);
   if (currentCampusId) {
-    await requirePermission({ permission: "admin.organization.write", campusId: currentCampusId });
+    await requireOfficeOrganizationWritePermission(currentCampusId);
   }
-  await requirePermission({ permission: "admin.organization.write", campusId: input.campusId });
+  await requireOfficeOrganizationWritePermission(input.campusId);
   const parsed = officeFormSchema.safeParse(input);
-  if (!parsed.success) return failure(parsed.error.issues[0]?.message ?? "Invalid office input");
+  if (!parsed.success)
+    return failure(parsed.error.issues[0]?.message ?? "Invalid office input");
   const before = await getOfficeSnapshot(officeId);
   const result = await updateOffice(officeId, parsed.data);
   if (!result.ok) return failure(result.error ?? "Failed to update office");
@@ -139,22 +189,26 @@ export async function updateOfficeAction(officeId: string, input: OfficeFormInpu
       metadata: { before, after: parsed.data },
     });
   } catch (e) {
-    console.error("audit_log_failed", e);
+    logServerError("audit_log_failed", e);
   }
   revalidatePath("/admin/offices");
   return success();
 }
 
-export async function toggleOfficeStatusAction(officeId: string, isActive: boolean): Promise<ActionResult> {
+export async function toggleOfficeStatusAction(
+  officeId: string,
+  isActive: boolean,
+): Promise<ActionResult> {
   const campusId = await getCampusIdByOfficeId(officeId);
   if (campusId) {
-    await requirePermission({ permission: "admin.organization.write", campusId });
+    await requireOfficeOrganizationWritePermission(campusId);
   } else {
     await requirePermission({ permission: "admin.organization.write" });
   }
   const before = await getOfficeSnapshot(officeId);
   const result = await setOfficeActive(officeId, isActive);
-  if (!result.ok) return failure(result.error ?? "Failed to update office status");
+  if (!result.ok)
+    return failure(result.error ?? "Failed to update office status");
   try {
     await writeAuditLog({
       eventType: "admin.office_status_toggled",
@@ -165,7 +219,7 @@ export async function toggleOfficeStatusAction(officeId: string, isActive: boole
       metadata: { before, isActive, previousIsActive: before?.isActive },
     });
   } catch (e) {
-    console.error("audit_log_failed", e);
+    logServerError("audit_log_failed", e);
   }
   revalidatePath("/admin/offices");
   return success();

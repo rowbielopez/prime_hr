@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAuthorizedUser } from "@/features/auth/server/require-authorized-user";
 import { getEmployeeIdForAppUser } from "@/features/auth/server/employee-link";
 import { writeAuditLog } from "@/features/audit/server/write-audit-log";
+import { logServerError } from "@/lib/logging/server-logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
     safeContactInfoSchema,
@@ -74,7 +75,7 @@ export async function updateMyContactInfoAction(
             },
         });
     } catch (e) {
-        console.error("audit_log_failed", e);
+        logServerError("audit_log_failed", e);
     }
 
     revalidatePath("/me");
