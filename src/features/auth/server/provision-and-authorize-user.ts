@@ -8,9 +8,13 @@ import type { Json } from "@/lib/db/types";
 type ProvisionResult =
   | { allowed: true }
   | {
-    allowed: false;
-    reason: "access_pending" | "unauthorized_access" | "profile_resolution_failed" | "ambiguous_employee_match";
-  };
+      allowed: false;
+      reason:
+        | "access_pending"
+        | "unauthorized_access"
+        | "profile_resolution_failed"
+        | "ambiguous_employee_match";
+    };
 
 type AppUserRow = {
   id: string;
@@ -18,6 +22,17 @@ type AppUserRow = {
   status: "active" | "inactive" | "suspended";
   is_active: boolean;
   primary_campus_id: string | null;
+};
+
+type EmployeeEmailMatch = {
+  id: string;
+  campus_id: string;
+};
+
+type AutoLinkResult = {
+  employeeId: string | null;
+  primaryCampusId: string | null;
+  linked: boolean;
 };
 
 type AuditLogInsert = Database["public"]["Tables"]["audit_logs"]["Insert"];
@@ -29,9 +44,14 @@ function getAdminClient(): SupabaseClient<Database> {
 
 function parseAuthUserName(user: User) {
   const metadata = user.user_metadata as Record<string, unknown> | undefined;
-  const fullName = typeof metadata?.full_name === "string" ? metadata.full_name.trim() : "";
-  const givenName = typeof metadata?.given_name === "string" ? metadata.given_name.trim() : "";
-  const familyName = typeof metadata?.family_name === "string" ? metadata.family_name.trim() : "";
+  const fullName =
+    typeof metadata?.full_name === "string" ? metadata.full_name.trim() : "";
+  const givenName =
+    typeof metadata?.given_name === "string" ? metadata.given_name.trim() : "";
+  const familyName =
+    typeof metadata?.family_name === "string"
+      ? metadata.family_name.trim()
+      : "";
 
   if (givenName || familyName) {
     return { firstName: givenName || null, lastName: familyName || null };
@@ -76,11 +96,124 @@ async function hasActiveRole(userId: string): Promise<boolean> {
 
   if (error) return false;
   const today = new Date().toISOString().slice(0, 10);
-  const rows = (data ?? []) as Array<{ effective_from: string | null; effective_to: string | null }>;
+  const rows = (data ?? []) as Array<{
+    effective_from: string | null;
+    effective_to: string | null;
+  }>;
   return hasAnyActiveRole(rows, today);
 }
 
-export async function provisionAndAuthorizeUser(authUser: User): Promise<ProvisionResult> {
+async function tryAutoLinkEmployeeByEmail(input: {
+  appUserId: string;
+  currentEmployeeId: string | null;
+  currentPrimaryCampusId: string | null;
+  normalizedEmail: string;
+}): Promise<AutoLinkResult> {
+  if (input.currentEmployeeId) {
+    return {
+      employeeId: input.currentEmployeeId,
+      primaryCampusId: input.currentPrimaryCampusId,
+      linked: false,
+    };
+  }
+
+  const admin = getAdminClient();
+  const { data: employeeMatches, error: employeeError } = await admin
+    .from("employees")
+    .select("id, campus_id")
+    .ilike("email", input.normalizedEmail)
+    .is("deleted_at", null)
+    .limit(2);
+
+  if (employeeError) {
+    logServerError("[provision] employee email match failed", employeeError);
+    return {
+      employeeId: null,
+      primaryCampusId: input.currentPrimaryCampusId,
+      linked: false,
+    };
+  }
+
+  const matches = (employeeMatches ?? []) as EmployeeEmailMatch[];
+  if (matches.length !== 1) {
+    return {
+      employeeId: null,
+      primaryCampusId: input.currentPrimaryCampusId,
+      linked: false,
+    };
+  }
+
+  const matchedEmployee = matches[0];
+  const { data: existingLinkedUser, error: linkedUserError } = await admin
+    .from("app_users")
+    .select("id")
+    .eq("employee_id", matchedEmployee.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (linkedUserError) {
+    logServerError(
+      "[provision] existing employee link check failed",
+      linkedUserError,
+    );
+    return {
+      employeeId: null,
+      primaryCampusId: input.currentPrimaryCampusId,
+      linked: false,
+    };
+  }
+
+  const linkedUserId =
+    (existingLinkedUser as { id: string } | null)?.id ?? null;
+  if (linkedUserId && linkedUserId !== input.appUserId) {
+    return {
+      employeeId: null,
+      primaryCampusId: input.currentPrimaryCampusId,
+      linked: false,
+    };
+  }
+
+  const primaryCampusId =
+    input.currentPrimaryCampusId ?? matchedEmployee.campus_id;
+  const { error: updateError } = await admin
+    .from("app_users")
+    .update({
+      employee_id: matchedEmployee.id,
+      primary_campus_id: primaryCampusId,
+    } as never)
+    .eq("id", input.appUserId);
+
+  if (updateError) {
+    logServerError("[provision] employee auto-link update failed", updateError);
+    return {
+      employeeId: null,
+      primaryCampusId: input.currentPrimaryCampusId,
+      linked: false,
+    };
+  }
+
+  await logAuthEvent({
+    eventType: "auth.employee_auto_linked",
+    action: "link_employee",
+    actorUserId: input.appUserId,
+    campusId: primaryCampusId,
+    metadata: {
+      email: input.normalizedEmail,
+      employee_id: matchedEmployee.id,
+      link_method: "sign_in_email_match",
+    },
+  }).catch(() => undefined);
+
+  return {
+    employeeId: matchedEmployee.id,
+    primaryCampusId,
+    linked: true,
+  };
+}
+
+export async function provisionAndAuthorizeUser(
+  authUser: User,
+): Promise<ProvisionResult> {
   try {
     if (!authUser.email) {
       return { allowed: false, reason: "profile_resolution_failed" };
@@ -103,11 +236,6 @@ export async function provisionAndAuthorizeUser(authUser: User): Promise<Provisi
 
     const appUser = existingUser as AppUserRow | null;
 
-    // NOTE: We intentionally do NOT auto-link employee_id here.
-    // The unique constraint uq_app_users_employee_id means only one app_user
-    // can own each employee. Auto-linking during sign-in would cause a 23505
-    // constraint error if another app_user already has that employee_id.
-    // Employee linking is managed by the admin via the employee detail page.
     const hasAmbiguousEmployeeMatch = false;
 
     if (!appUser) {
@@ -155,15 +283,30 @@ export async function provisionAndAuthorizeUser(authUser: User): Promise<Provisi
                 last_login_at: new Date().toISOString(),
               } as never)
               .eq("id", claimable.id);
+            const autoLinkResult = await tryAutoLinkEmployeeByEmail({
+              appUserId: claimable.id,
+              currentEmployeeId: claimable.employee_id,
+              currentPrimaryCampusId: claimable.primary_campus_id,
+              normalizedEmail,
+            });
             await logAuthEvent({
               eventType: "auth.account_reclaimed_by_email",
               action: "reclaim",
               actorUserId: claimable.id,
-              campusId: claimable.primary_campus_id,
-              metadata: { auth_user_id: authUser.id, email: normalizedEmail },
+              campusId:
+                autoLinkResult.primaryCampusId ?? claimable.primary_campus_id,
+              metadata: {
+                auth_user_id: authUser.id,
+                email: normalizedEmail,
+                employee_id:
+                  autoLinkResult.employeeId ?? claimable.employee_id ?? null,
+              },
             }).catch(() => undefined);
             const userHasRole = await hasActiveRole(claimable.id);
-            const isAllowed = claimable.status === "active" && claimable.is_active && userHasRole;
+            const isAllowed =
+              claimable.status === "active" &&
+              claimable.is_active &&
+              userHasRole;
             if (!isAllowed) {
               return { allowed: false, reason: "access_pending" };
             }
@@ -178,43 +321,60 @@ export async function provisionAndAuthorizeUser(authUser: User): Promise<Provisi
         eventType: "auth.first_login_provisioned",
         action: "provision",
         actorUserId: (createdUser as { id: string }).id,
-        campusId: (createdUser as { primary_campus_id: string | null }).primary_campus_id,
+        campusId: (createdUser as { primary_campus_id: string | null })
+          .primary_campus_id,
         metadata: {
           auth_user_id: authUser.id,
           email: normalizedEmail,
         },
       }).catch(() => undefined);
 
+      await tryAutoLinkEmployeeByEmail({
+        appUserId: (createdUser as { id: string }).id,
+        currentEmployeeId: null,
+        currentPrimaryCampusId: (
+          createdUser as { primary_campus_id: string | null }
+        ).primary_campus_id,
+        normalizedEmail,
+      });
+
       return { allowed: false, reason: "access_pending" };
     }
 
     await admin
       .from("app_users")
-      .update(
-        {
-          email: normalizedEmail,
-          first_name: firstName,
-          last_name: lastName,
-          // Do NOT change employee_id here — only the admin linking UI may do that.
-          last_login_at: new Date().toISOString(),
-        } as never
-      )
+      .update({
+        email: normalizedEmail,
+        first_name: firstName,
+        last_name: lastName,
+        // Do NOT change employee_id here — only the admin linking UI may do that.
+        last_login_at: new Date().toISOString(),
+      } as never)
       .eq("id", appUser.id);
 
+    const autoLinkResult = await tryAutoLinkEmployeeByEmail({
+      appUserId: appUser.id,
+      currentEmployeeId: appUser.employee_id,
+      currentPrimaryCampusId: appUser.primary_campus_id,
+      normalizedEmail,
+    });
+
     const userHasRole = await hasActiveRole(appUser.id);
-    const isAllowed = appUser.status === "active" && appUser.is_active && userHasRole;
+    const isAllowed =
+      appUser.status === "active" && appUser.is_active && userHasRole;
 
     await logAuthEvent({
       eventType: isAllowed ? "auth.sign_in_success" : "auth.sign_in_blocked",
       action: "sign_in",
       actorUserId: appUser.id,
-      campusId: appUser.primary_campus_id,
+      campusId: autoLinkResult.primaryCampusId ?? appUser.primary_campus_id,
       metadata: {
         auth_user_id: authUser.id,
         email: normalizedEmail,
         status: appUser.status,
         is_active: appUser.is_active,
         has_active_role: userHasRole,
+        employee_id: autoLinkResult.employeeId ?? appUser.employee_id,
       },
     }).catch(() => undefined);
 
@@ -231,4 +391,3 @@ export async function provisionAndAuthorizeUser(authUser: User): Promise<Provisi
     return { allowed: false, reason: "profile_resolution_failed" };
   }
 }
-
